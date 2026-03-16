@@ -3,19 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tastely — Your Taste, Tracked</title>
-    <meta name="description" content="One place for everything you're into. Movies, music, books, games, events — track it all, discover more, share with friends.">
+    <title>Tastely — Discover Better Recommendations</title>
+    <meta name="description" content="Discover better recommendations. Movies, music, books, games, events — track what you love, discover what's next, share with friends.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #08080a;
-            --surface: #111114;
-            --surface-2: #19191e;
-            --accent: #7c6aff;
-            --accent-glow: rgba(124, 106, 255, 0.35);
-            --accent-subtle: rgba(124, 106, 255, 0.08);
+            --bg: #120f24;
+            --surface: #1a1730;
+            --surface-2: #221f3a;
+            --accent: #8b52ee;
+            --accent-glow: rgba(139, 82, 238, 0.35);
+            --accent-subtle: rgba(139, 82, 238, 0.08);
+            --pink: #fb4c96;
+            --blue: #3ab7f2;
             --text: #f0eff4;
             --text-dim: #8a8894;
             --text-muted: #5c5a66;
@@ -50,13 +52,13 @@
         }
         .glow-orb-2 {
             width: 400px; height: 400px;
-            background: rgba(255, 106, 136, 0.15);
+            background: rgba(251, 76, 150, 0.15);
             bottom: 10%; right: -100px;
             opacity: 0.5;
         }
         .glow-orb-3 {
             width: 300px; height: 300px;
-            background: rgba(106, 210, 255, 0.1);
+            background: rgba(58, 183, 242, 0.1);
             top: 50%; left: 30%;
             opacity: 0.3;
         }
@@ -78,14 +80,12 @@
             justify-content: space-between;
         }
         .logo {
-            font-family: 'Syne', sans-serif;
-            font-weight: 800;
-            font-size: 26px;
-            letter-spacing: -0.5px;
-            background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            display: flex;
+            align-items: center;
+        }
+        .logo img {
+            height: 32px;
+            width: auto;
         }
         .nav-cta {
             padding: 10px 24px;
@@ -147,7 +147,7 @@
             animation: fadeInUp 0.8s ease 0.1s both;
         }
         h1 .highlight {
-            background: linear-gradient(135deg, var(--accent), #ff6a88, #6ad2ff);
+            background: linear-gradient(135deg, var(--accent), var(--pink), var(--blue));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -203,7 +203,7 @@
             white-space: nowrap;
         }
         .waitlist-form button:hover {
-            background: #6b58f0;
+            background: #7a42e0;
             transform: translateY(-1px);
             box-shadow: 0 8px 30px var(--accent-glow);
         }
@@ -332,7 +332,7 @@
             justify-content: space-between;
             align-items: center;
         }
-        footer .logo { font-size: 20px; }
+        footer .logo img { height: 24px; }
         footer p {
             font-size: 13px;
             color: var(--text-muted);
@@ -360,13 +360,13 @@
 
     <div class="container">
         <nav>
-            <div class="logo">tastely</div>
+            <div class="logo"><img src="tastely-logo.png" alt="Tastely"></div>
             <a href="#waitlist" class="nav-cta">Join waitlist</a>
         </nav>
 
         <section class="hero" id="waitlist">
             <div class="hero-badge">Coming Soon</div>
-            <h1>Your taste.<br><span class="highlight">Tracked.</span></h1>
+            <h1>Discover better<br><span class="highlight">recommendations.</span></h1>
             <p class="hero-sub">One place for everything you're into. Movies, music, books, games, events — track what you love, discover what's next, share with friends.</p>
 
             <form class="waitlist-form" id="waitlistForm">
@@ -414,23 +414,42 @@
         </section>
 
         <footer>
-            <div class="logo">tastely</div>
+            <div class="logo"><img src="tastely-logo.png" alt="Tastely"></div>
             <p>&copy; 2026 Tastely. All rights reserved.</p>
         </footer>
     </div>
 
     <script>
-        document.getElementById('waitlistForm').addEventListener('submit', function(e) {
+        document.getElementById('waitlistForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const email = document.getElementById('emailInput').value;
+            const btn = this.querySelector('button');
+            const origText = btn.textContent;
+            btn.textContent = 'Joining...';
+            btn.disabled = true;
 
-            // For now, just show success. Later, connect to Supabase or Mailchimp.
-            this.style.display = 'none';
-            document.getElementById('waitlistSuccess').style.display = 'block';
-            document.querySelector('.waitlist-note').style.display = 'none';
+            try {
+                const res = await fetch('https://uwekxpvvukpzvlnxqzpd.supabase.co/functions/v1/waitlist-signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3ZWt4cHZ2dWtwenZsbnhxenBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDY3NjcsImV4cCI6MjA4OTA4Mjc2N30.bNOc3ElhbWggEQtquYM7FgClHubbeDgwQeArCTQobTE'
+                    },
+                    body: JSON.stringify({ email: email })
+                });
 
-            // Log to console for now — replace with actual API call
-            console.log('Waitlist signup:', email);
+                if (res.ok) {
+                    this.style.display = 'none';
+                    document.getElementById('waitlistSuccess').style.display = 'block';
+                    document.querySelector('.waitlist-note').style.display = 'none';
+                } else {
+                    throw new Error('Signup failed');
+                }
+            } catch (err) {
+                btn.textContent = origText;
+                btn.disabled = false;
+                alert('Something went wrong. Please try again.');
+            }
         });
     </script>
 
