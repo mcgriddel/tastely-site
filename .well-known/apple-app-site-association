@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["Y5X837AF2B.com.tastely.ios"],
+        "paths": [
+          "/movie/*",
+          "/item/*",
+          "/user/*",
+          "/library/*"
+        ]
+      }
+    ]
+  }
+}
