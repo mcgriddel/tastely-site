@@ -3,37 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Open in Tastely</title>
+    <title>Tastely</title>
     <meta name="description" content="Open this link in the Tastely app.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Outfit:wght@400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: #121212;
+            background: #0F0F0F;
             color: #F1F1F1;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             -webkit-font-smoothing: antialiased;
         }
-        .card {
+
+        /* ── Default: "Open in App" card ── */
+        .app-card {
             text-align: center;
             padding: 48px 32px;
             max-width: 400px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         .icon {
             width: 80px;
             height: 80px;
             border-radius: 20px;
-            margin: 0 auto 28px;
+            margin-bottom: 28px;
             overflow: hidden;
         }
         .icon img { width: 100%; height: 100%; object-fit: cover; }
-        h1 {
+        .app-card h1 {
             font-size: 22px;
             font-weight: 700;
             margin-bottom: 10px;
@@ -73,13 +78,163 @@
             transition: color 0.2s ease;
         }
         .home-link:hover { color: #A1A1A1; }
+
+        /* ── Board preview ── */
+        .board-page { display: none; }
+        .board-page.active { display: block; }
+        .board-container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 24px 16px 48px;
+        }
+        .board-logo {
+            margin-bottom: 24px;
+        }
+        .board-logo img {
+            height: 28px;
+            width: auto;
+        }
+        .board-header { text-align: center; margin-bottom: 28px; }
+        .board-label {
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            color: #8b52ee;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .board-header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            line-height: 1.2;
+            margin-bottom: 6px;
+            letter-spacing: -0.3px;
+        }
+        .board-subtitle {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            color: #9CA3AF;
+        }
+        .board-description {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            color: #6B7280;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+
+        /* Poster grid — Spotify playlist style */
+        .poster-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+        .grid-item {
+            border-radius: 8px;
+            overflow: hidden;
+            background: #1A1A1A;
+        }
+        .grid-item img {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            display: block;
+        }
+        .grid-item-info {
+            padding: 8px 8px 10px;
+        }
+        .grid-item-title {
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.3;
+            margin-bottom: 2px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .grid-item-meta {
+            font-family: 'Outfit', sans-serif;
+            font-size: 11px;
+            color: #9CA3AF;
+        }
+
+        /* Item list fallback (used for books without posters) */
+        .item-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+        .list-item {
+            display: flex;
+            gap: 12px;
+            background: #1A1A1A;
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .list-poster {
+            width: 52px;
+            height: 78px;
+            border-radius: 6px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: #252525;
+        }
+        .list-info { display: flex; flex-direction: column; justify-content: center; }
+        .list-title { font-weight: 500; font-size: 15px; margin-bottom: 3px; }
+        .list-meta { font-family: 'Outfit', sans-serif; font-size: 13px; color: #9CA3AF; }
+
+        /* CTA footer */
+        .board-cta { text-align: center; padding: 24px 0 16px; }
+        .board-cta-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            color: #6B7280;
+            margin-bottom: 14px;
+        }
+        .board-cta-btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #8b52ee, #fb4c96);
+            color: #FFFFFF;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 15px;
+            padding: 13px 36px;
+            border-radius: 24px;
+            text-decoration: none;
+            transition: all 0.2s ease;
+        }
+        .board-cta-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(139, 82, 238, 0.25);
+        }
+        .board-open-app {
+            display: block;
+            margin-top: 12px;
+            font-size: 13px;
+            color: #6B6B6B;
+            text-decoration: none;
+        }
+        .board-open-app:hover { color: #A1A1A1; }
+
+        /* Loading state */
+        .board-loading {
+            text-align: center;
+            padding: 80px 0;
+            color: #6B7280;
+            font-family: 'Outfit', sans-serif;
+        }
+        .board-error {
+            text-align: center;
+            padding: 60px 0;
+            color: #6B7280;
+        }
+
+        /* Subtle glow */
         .glow {
             position: fixed;
             width: 400px; height: 400px;
             border-radius: 50%;
             filter: blur(140px);
             pointer-events: none;
-            background: rgba(139, 82, 238, 0.08);
+            background: rgba(139, 82, 238, 0.06);
             top: -100px; left: 50%;
             transform: translateX(-50%);
         }
@@ -87,7 +242,30 @@
 </head>
 <body>
     <div class="glow"></div>
-    <div class="card">
+
+    <!-- Board preview (hidden until JS activates) -->
+    <div class="board-page" id="boardPage">
+        <div class="board-container">
+            <div class="board-logo"><img src="/wordmark.png" alt="Tastely"></div>
+            <div class="board-header">
+                <div class="board-label">Board</div>
+                <h1 id="boardTitle">...</h1>
+                <p class="board-subtitle" id="boardSubtitle"></p>
+                <p class="board-description" id="boardDescription"></p>
+            </div>
+            <div id="boardContent">
+                <div class="board-loading">Loading...</div>
+            </div>
+            <div class="board-cta">
+                <p class="board-cta-text">Discover more on Tastely</p>
+                <a class="board-cta-btn" id="boardCtaBtn" href="https://trytastely.com">Get Tastely</a>
+                <a class="board-open-app" id="boardOpenApp" href="#">Open in app</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Default: generic "Open in App" card -->
+    <div class="app-card" id="appCard">
         <div class="icon"><img src="/tastely-logo.png" alt="Tastely"></div>
         <h1>Open in Tastely</h1>
         <p class="sub" id="message">Tap below to view this in the app.</p>
@@ -102,19 +280,25 @@
             var search = window.location.search;
             var deepLink = 'tastely://' + path.replace(/^\//, '') + search;
 
-            // Try to open the app via custom scheme
+            // ── Board preview ──
+            var boardMatch = path.match(/^\/library\/([a-f0-9-]+)/i);
+            if (boardMatch) {
+                document.getElementById('appCard').style.display = 'none';
+                document.getElementById('boardPage').classList.add('active');
+                document.getElementById('boardOpenApp').href = deepLink;
+                loadBoard(boardMatch[1]);
+                return;
+            }
+
+            // ── Default deep link handler ──
             var btn = document.getElementById('openBtn');
             btn.href = deepLink;
 
-            // On mobile, try to open immediately
             var ua = navigator.userAgent || '';
             var isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
 
             if (isMobile) {
-                // Attempt custom scheme redirect
                 window.location.href = deepLink;
-
-                // If still here after 1.5s, the app isn't installed — show store link
                 setTimeout(function() {
                     var isIOS = /iPhone|iPad|iPod/i.test(ua);
                     if (isIOS) {
@@ -128,17 +312,120 @@
                 }, 1500);
             }
 
-            // Set contextual message based on path
             if (path.startsWith('/movie/')) {
                 document.getElementById('message').textContent = 'Tap below to see this movie in Tastely.';
             } else if (path.startsWith('/user/')) {
                 document.getElementById('message').textContent = 'Tap below to see this profile in Tastely.';
-            } else if (path.startsWith('/library/')) {
-                document.getElementById('message').textContent = 'Tap below to see this board in Tastely.';
             } else if (path.startsWith('/item/')) {
                 document.getElementById('message').textContent = 'Tap below to view this in Tastely.';
             }
         })();
+
+        // ── Board preview loader ──
+        var SUPABASE_URL = 'https://uwekxpvvukpzvlnxqzpd.supabase.co';
+        var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV3ZWt4cHZ2dWtwenZsbnhxenBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MDY3NjcsImV4cCI6MjA4OTA4Mjc2N30.bNOc3ElhbWggEQtquYM7FgClHubbeDgwQeArCTQobTE';
+        var TMDB_IMG = 'https://image.tmdb.org/t/p';
+
+        function supaFetch(table, query) {
+            var url = SUPABASE_URL + '/rest/v1/' + table + '?' + query;
+            return fetch(url, {
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': 'Bearer ' + SUPABASE_ANON_KEY,
+                    'Accept': 'application/json'
+                }
+            }).then(function(r) { return r.json(); });
+        }
+
+        function esc(str) {
+            var d = document.createElement('div');
+            d.textContent = str || '';
+            return d.innerHTML;
+        }
+
+        function loadBoard(boardId) {
+            // Fetch board metadata
+            var boardP = supaFetch('boards', 'id=eq.' + boardId + '&select=id,name,description,user_id,is_public,cover_url');
+            // Fetch board items with joined item data
+            var itemsP = supaFetch('board_items', 'board_id=eq.' + boardId + '&select=item_id,position,items(title,image_url,external_id,item_type,metadata)&order=position.asc&limit=30');
+            // Fetch in parallel
+            Promise.all([boardP, itemsP]).then(function(results) {
+                var boards = results[0];
+                var boardItems = results[1];
+
+                if (!boards || !boards.length) {
+                    showBoardError('This board is private or doesn\'t exist.');
+                    return;
+                }
+
+                var board = boards[0];
+                var items = (boardItems || []).map(function(bi) { return bi.items; }).filter(Boolean);
+
+                // Fetch creator name
+                supaFetch('profiles', 'id=eq.' + board.user_id + '&select=username,display_name').then(function(profiles) {
+                    var creator = (profiles && profiles[0]) ? (profiles[0].display_name || profiles[0].username || 'someone') : 'someone';
+                    renderBoard(board, items, creator);
+                }).catch(function() {
+                    renderBoard(board, items, 'someone');
+                });
+            }).catch(function() {
+                showBoardError('Could not load this board.');
+            });
+        }
+
+        function renderBoard(board, items, creator) {
+            document.title = esc(board.name) + ' — Tastely';
+            document.getElementById('boardTitle').textContent = board.name;
+            document.getElementById('boardSubtitle').textContent = 'by ' + creator + ' · ' + items.length + ' ' + (items.length === 1 ? 'item' : 'items');
+            if (board.description) {
+                document.getElementById('boardDescription').textContent = board.description;
+            }
+
+            var content = document.getElementById('boardContent');
+            if (!items.length) {
+                content.innerHTML = '<div class="board-error"><p>This board is empty</p></div>';
+                return;
+            }
+
+            // Render as poster grid
+            var html = '<div class="poster-grid">';
+            items.forEach(function(item) {
+                var isMovie = item.item_type === 'movie';
+                var posterUrl = '';
+                if (item.image_url) {
+                    posterUrl = isMovie
+                        ? TMDB_IMG + '/w342' + item.image_url
+                        : item.image_url;
+                }
+                var year = '';
+                var rating = '';
+                if (item.metadata) {
+                    if (item.metadata.releaseDate) year = item.metadata.releaseDate.substring(0, 4);
+                    else if (item.metadata.publishedDate) year = item.metadata.publishedDate.substring(0, 4);
+                    if (item.metadata.voteAverage) rating = '★ ' + Number(item.metadata.voteAverage).toFixed(1);
+                }
+                var meta = [year, rating].filter(Boolean).join(' · ');
+
+                html += '<div class="grid-item">';
+                if (posterUrl) {
+                    html += '<img src="' + esc(posterUrl) + '" alt="' + esc(item.title) + '" loading="lazy" />';
+                } else {
+                    html += '<div style="aspect-ratio:2/3;background:#252525;"></div>';
+                }
+                html += '<div class="grid-item-info">';
+                html += '<div class="grid-item-title">' + esc(item.title) + '</div>';
+                if (meta) html += '<div class="grid-item-meta">' + esc(meta) + '</div>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+            content.innerHTML = html;
+        }
+
+        function showBoardError(msg) {
+            document.getElementById('boardContent').innerHTML = '<div class="board-error"><p>' + esc(msg) + '</p></div>';
+            document.getElementById('boardTitle').textContent = 'Board';
+            document.getElementById('boardSubtitle').textContent = '';
+        }
     </script>
 </body>
 </html>
