@@ -1,0 +1,13 @@
+{
+  "name": "tastely-site",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler pages dev .",
+    "deploy": "wrangler pages deploy ."
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250410.0",
+    "wrangler": "^3.114.0",
+    "typescript": "^5.4.0"
+  }
+}

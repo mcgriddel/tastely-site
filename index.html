@@ -6,6 +6,9 @@
     <title>Tastely — Follow Your Interests</title>
     <meta name="description" content="Follow your interests. Stay organized and discover better recommendations.">
 
+    <!-- Smart App Banner (iOS Safari) -->
+    <meta name="apple-itunes-app" content="app-id=6761599195">
+
     <!-- Open Graph -->
     <meta property="og:title" content="Tastely — Follow Your Interests">
     <meta property="og:description" content="Stay organized and discover better recommendations.">
@@ -30,27 +33,22 @@
             color: #F1F1F1;
             min-height: 100vh;
             -webkit-font-smoothing: antialiased;
+            display: flex;
+            flex-direction: column;
         }
 
-        .container {
-            position: relative;
-            z-index: 1;
-            max-width: 680px;
-            margin: 0 auto;
-            padding: 0 24px;
-        }
-
-        /* Nav */
+        /* Nav — full width */
         nav {
-            max-width: 680px;
-            margin: 0 auto;
-            padding: 4px 24px;
+            width: 100%;
+            padding: 20px 32px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            position: relative;
+            z-index: 1;
         }
-        .logo img {
-            height: 128px;
+        .nav-logo img {
+            height: 32px;
             width: auto;
             opacity: 0.9;
         }
@@ -65,15 +63,26 @@
             letter-spacing: 0.5px;
         }
 
-        /* Hero */
+        /* Hero — vertically centered in remaining space */
+        .hero-wrap {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+            padding: 0 24px;
+        }
         .hero {
-            padding: 0 0 60px;
             text-align: center;
+            max-width: 560px;
+            width: 100%;
+            padding: 0 0 40px;
         }
 
         .hero-wordmark {
-            width: 200px;
-            height: auto;
+            height: 80px;
+            width: auto;
             margin-bottom: 32px;
             opacity: 0.95;
             animation: fadeIn 0.8s ease both;
@@ -81,10 +90,10 @@
 
         h1 {
             font-weight: 700;
-            font-size: clamp(26px, 4vw, 36px);
+            font-size: clamp(28px, 4vw, 42px);
             line-height: 1.15;
             letter-spacing: -0.5px;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             color: #F1F1F1;
             animation: fadeIn 0.8s ease 0.1s both;
         }
@@ -96,11 +105,11 @@
         }
         .hero-sub {
             font-family: 'Outfit', sans-serif;
-            font-size: 15px;
+            font-size: 16px;
             font-weight: 400;
             color: #A1A1A1;
-            max-width: 440px;
-            margin: 0 auto 48px;
+            max-width: 400px;
+            margin: 0 auto 40px;
             line-height: 1.6;
             animation: fadeIn 0.8s ease 0.2s both;
         }
@@ -173,21 +182,18 @@
             text-align: center;
         }
 
-        @media (max-width: 640px) {
-            .waitlist-form { flex-direction: column; }
-            .waitlist-form button { width: 100%; }
-            .hero { padding: 0 0 48px; }
-        }
-
-        /* Footer */
+        /* Footer — full width */
         footer {
+            width: 100%;
             border-top: 1px solid #1F1F1F;
-            padding: 28px 0;
+            padding: 24px 32px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: relative;
+            z-index: 1;
         }
-        footer .logo img { height: 20px; opacity: 0.5; }
+        footer .footer-logo img { height: 20px; opacity: 0.5; }
         .footer-right {
             display: flex;
             align-items: center;
@@ -203,6 +209,16 @@
         footer p {
             font-size: 12px;
             color: #6B6B6B;
+        }
+
+        /* Mobile */
+        @media (max-width: 640px) {
+            nav { padding: 16px 20px; }
+            .hero { padding: 0 0 32px; }
+            .hero-wordmark { height: 64px; margin-bottom: 24px; }
+            .waitlist-form { flex-direction: column; }
+            .waitlist-form button { width: 100%; }
+            footer { padding: 20px; }
         }
 
         /* Subtle ambient glow */
@@ -236,13 +252,14 @@
     <div class="glow glow-1"></div>
     <div class="glow glow-2"></div>
 
-    <nav style="position: relative; z-index: 1;">
-        <div class="logo"><img src="wordmark.png" alt="Tastely"></div>
+    <nav>
+        <div class="nav-logo"><img src="wordmark.png" alt="Tastely"></div>
         <div class="nav-pill">Coming Soon</div>
     </nav>
 
-    <div class="container">
+    <div class="hero-wrap">
         <section class="hero" id="waitlist">
+            <img src="wordmark.png" alt="Tastely" class="hero-wordmark">
             <h1>Follow your interests</h1>
             <p class="hero-sub">Stay organized and discover better recommendations.</p>
 
@@ -255,16 +272,16 @@
             </div>
             <p class="waitlist-note">Be first to know when we launch.</p>
         </section>
-
-        <footer>
-            <div class="logo"><img src="wordmark.png" alt="Tastely"></div>
-            <div class="footer-right">
-                <a href="/privacy.html" class="footer-link">Privacy</a>
-                <a href="/terms.html" class="footer-link">Terms</a>
-                <p>&copy; 2026 Tastely</p>
-            </div>
-        </footer>
     </div>
+
+    <footer>
+        <div class="footer-logo"><img src="wordmark.png" alt="Tastely"></div>
+        <div class="footer-right">
+            <a href="/privacy.html" class="footer-link">Privacy</a>
+            <a href="/terms.html" class="footer-link">Terms</a>
+            <p>&copy; 2026 Tastely</p>
+        </div>
+    </footer>
 
     <script>
         document.getElementById('waitlistForm').addEventListener('submit', async function(e) {
