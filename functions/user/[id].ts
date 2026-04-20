@@ -27,7 +27,11 @@ const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 function coverSmall(it: UserItemRow['items']): string {
   if (!it) return '';
-  if (it.item_type === 'movie' && it.image_url) return `${TMDB_IMAGE_BASE}/w342${it.image_url}`;
+  if (it.item_type === 'movie' && it.image_url) {
+    return it.image_url.startsWith('http')
+      ? it.image_url.replace(/\/t\/p\/w\d+\//, '/t/p/w342/')
+      : `${TMDB_IMAGE_BASE}/w342${it.image_url}`;
+  }
   if (it.image_url) return it.image_url.replace(/^http:/, 'https:');
   if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-M.jpg`;
   return '';

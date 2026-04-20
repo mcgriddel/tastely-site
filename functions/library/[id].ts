@@ -33,9 +33,14 @@ type BoardItemRow = {
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
+function tmdbAtSize(raw: string, size: string): string {
+  if (raw.startsWith('http')) return raw.replace(/\/t\/p\/w\d+\//, `/t/p/${size}/`);
+  return `${TMDB_IMAGE_BASE}/${size}${raw}`;
+}
+
 function coverForItem(it: BoardItemRow['items']): string {
   if (!it) return '';
-  if (it.item_type === 'movie' && it.image_url) return `${TMDB_IMAGE_BASE}/w154${it.image_url}`;
+  if (it.item_type === 'movie' && it.image_url) return tmdbAtSize(it.image_url, 'w154');
   if (it.item_type === 'movie' && !it.image_url) return '';
   if (it.image_url) return it.image_url.replace(/^http:/, 'https:');
   if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-M.jpg`;
@@ -44,7 +49,7 @@ function coverForItem(it: BoardItemRow['items']): string {
 
 function bigCoverForItem(it: BoardItemRow['items']): string {
   if (!it) return '';
-  if (it.item_type === 'movie' && it.image_url) return `${TMDB_IMAGE_BASE}/w500${it.image_url}`;
+  if (it.item_type === 'movie' && it.image_url) return tmdbAtSize(it.image_url, 'w500');
   if (it.image_url) return it.image_url.replace(/^http:/, 'https:');
   if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-L.jpg`;
   return '';

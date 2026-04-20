@@ -92,7 +92,11 @@ type RenderArgs = {
 };
 
 function renderMovie(a: RenderArgs): Response {
-  const posterUrl = a.posterPath ? `${TMDB_IMAGE_BASE}/w500${a.posterPath}` : '';
+  const posterUrl = a.posterPath
+    ? a.posterPath.startsWith('http')
+      ? a.posterPath.replace(/\/t\/p\/w\d+\//, '/t/p/w500/')
+      : `${TMDB_IMAGE_BASE}/w500${a.posterPath}`
+    : '';
   const year = a.releaseDate ? a.releaseDate.slice(0, 4) : '';
   const runtimeStr = a.runtime ? `${Math.floor(a.runtime / 60)}h ${a.runtime % 60}m` : '';
   const ratingStr = a.voteAverage ? `★ ${a.voteAverage.toFixed(1)}` : '';
