@@ -11,10 +11,16 @@ type DbBook = {
   metadata: {
     authors?: string[];
     isbn?: string;
+    isbn_13?: string;
     publishedDate?: string;
     categories?: string[];
     averageRating?: number;
     pageCount?: number;
+    // S139 — multi-source cover registry written by the resolver at ingest.
+    // Each entry: { url, source, priority, license, attribution, verified_at }.
+    // The Cloudflare function chains through these for the og:image to handle
+    // URL rot between ingest time + share-preview render time.
+    image_sources?: Array<{ url: string; source: string; priority: number }>;
   } | null;
 };
 
@@ -48,7 +54,23 @@ function pickBestCover(links?: GoogleBook['volumeInfo']['imageLinks']): string {
 function openLibraryCover(isbn?: string): string {
   if (!isbn) return '';
   const clean = isbn.replace(/[^0-9Xx]/g, '');
-  return clean ? `https://covers.openlibrary.org/b/isbn/${clean}-L.jpg` : '';
+  // S139 — strict mode `?default=false` so OL returns 404 (instead of a 1×1
+  // GIF placeholder) for ISBNs without a cover. Lets receiving share clients
+  // (iMessage / Twitter / etc.) fall through to no-image rather than render
+  // a phantom blank tile.
+  return clean ? `https://covers.openlibrary.org/b/isbn/${clean}-L.jpg?default=false` : '';
+}
+
+// S139 — pick the first working cover URL out of the resolver's persisted
+// chain. This is the server-side mirror of the client's SmartCover ladder:
+// when ingest captured multiple candidate URLs, the share-preview server
+// can pick one that's still valid even if the canonical `image_url` rotted.
+function pickFromImageSources(
+  sources: Array<{ url: string; priority: number }> | undefined,
+): string {
+  if (!sources || sources.length === 0) return '';
+  const sorted = [...sources].sort((a, b) => a.priority - b.priority);
+  return sorted[0]?.url ?? '';
 }
 
 function pickIsbn(ids?: { type: string; identifier: string }[]): string {
@@ -72,13 +94,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
 
   if (item) {
     const authors = item.metadata?.authors ?? [];
-    const cover = item.image_url || openLibraryCover(item.metadata?.isbn);
+    // S139 — extended cover resolution chain: items.image_url →
+    // metadata.image_sources[] (resolver-persisted candidates) → OL by ISBN
+    // → empty (no og:image, receiver renders no preview rather than phantom).
+    const isbn = item.metadata?.isbn ?? item.metadata?.isbn_13;
+    const fromChain = pickFromImageSources(item.metadata?.image_sources);
+    const cover = item.image_url || fromChain || openLibraryCover(isbn);
     return renderBook({
       title: item.title,
       authors,
       description: item.description ?? '',
       cover,
-      fallbackCover: openLibraryCover(item.metadata?.isbn),
+      fallbackCover: fromChain || openLibraryCover(isbn),
       publishedDate: item.metadata?.publishedDate ?? '',
       categories: item.metadata?.categories ?? [],
       averageRating: item.metadata?.averageRating ?? null,
