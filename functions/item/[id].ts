@@ -1,4 +1,4 @@
-import { escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
+import { escapeAttr, escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
 import { sbFetch, sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 import { lookupSharer } from '../_lib/sharer';
 
