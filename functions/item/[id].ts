@@ -21,6 +21,11 @@ type DbBook = {
     publisher?: string;
     // S139 — multi-source cover registry written by the resolver at ingest.
     image_sources?: Array<{ url: string; source: string; priority: number; license?: string }>;
+    // S139 NYT bestseller substrate — when present, NYT's `book_image` is
+    // higher-quality than the OL cover the resolver typically lands. Used as
+    // a fallback when the canonical `image_url` happens to point at OL's
+    // (sometimes wrong) ISBN cover.
+    nyt_lists?: Array<{ book_image?: string; rank?: number }>;
   } | null;
 };
 
@@ -125,7 +130,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     const authors = item.metadata?.authors ?? [];
     const isbn = item.metadata?.isbn ?? item.metadata?.isbn_13;
     const fromChain = pickFromImageSources(item.metadata?.image_sources);
-    const cover = item.image_url || fromChain || openLibraryCover(isbn);
+    // S140 — NYT cover fallback. Books ingested via NYT bestseller substrate
+    // have higher-quality covers in `metadata.nyt_lists[].book_image` than
+    // OL's ISBN endpoint sometimes serves (Theo of Golden case: OL returned
+    // a wrong scribbled image). Prefer NYT when the canonical `image_url`
+    // points at OL and a NYT image is present in metadata.
+    const nytCover = item.metadata?.nyt_lists?.[0]?.book_image ?? '';
+    const isOlCanonical = (item.image_url ?? '').includes('covers.openlibrary.org');
+    const cover = (isOlCanonical && nytCover)
+      ? nytCover
+      : (item.image_url || nytCover || fromChain || openLibraryCover(isbn));
     const sharer = await sharerPromise;
 
     return renderBook({
@@ -133,7 +147,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       authors,
       description: item.description ?? '',
       cover,
-      fallbackCover: fromChain || openLibraryCover(isbn),
+      fallbackCover: nytCover || fromChain || openLibraryCover(isbn),
       publishedDate: item.metadata?.publishedDate ?? '',
       categories: item.metadata?.categories ?? [],
       pageCount: item.metadata?.pageCount ?? null,

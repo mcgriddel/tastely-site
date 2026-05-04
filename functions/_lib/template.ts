@@ -470,9 +470,13 @@ const BASE_STYLES = `<style>
     --text-3: #9CA3AF;
     --text-4: #6B7280;
     --brand-purple: #8b52ee;
-    --brand-pink: #fb4c96;
-    --brand-blue: #3ab7f2;
-    --brand-grad: linear-gradient(135deg, #8b52ee 0%, #fb4c96 55%, #3ab7f2 100%);
+    /* Hero CTA = Fuchsia v2 smoothed gradient — locked at .claude/docs/ux-buttons.md §1.
+       Brand purple is scarce signal; gradient lives ONLY on hero CTAs (the sticky-bar
+       "Get the app" + modal primary "Save my spot" / "Get the Tastely app"). Companion
+       CTAs use ghost-outline; everything else stays neutral. */
+    --brand-grad: linear-gradient(180deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 40%, transparent 100%),
+                  linear-gradient(125deg, #8b52ee 0%, #a85eee 35%, #c459ee 65%, #df53ee 100%);
+    --brand-shadow: 0 4px 16px rgba(139, 82, 238, 0.32);
   }
 
   html, body { background: var(--bg); color: var(--text); min-height: 100%; }
@@ -579,11 +583,8 @@ const BASE_STYLES = `<style>
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--brand-grad);
-    padding: 2px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: 1.5px solid rgba(255,255,255,0.18);
+    overflow: hidden;
   }
   .sharer-avatar img,
   .sharer-avatar-fallback {
@@ -593,7 +594,7 @@ const BASE_STYLES = `<style>
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg);
+    background: var(--surface);
     color: var(--text);
     font-family: 'Inter', sans-serif;
     font-weight: 600;
@@ -881,14 +882,15 @@ const BASE_STYLES = `<style>
     font-family: 'Inter', sans-serif;
     font-weight: 600;
     font-size: 13px;
-    padding: 9px 18px;
+    padding: 10px 20px;
     border-radius: 999px;
     transition: transform 0.18s ease, box-shadow 0.18s ease;
-    box-shadow: 0 4px 14px rgba(139, 82, 238, 0.3);
+    box-shadow: var(--brand-shadow);
+    letter-spacing: 0.1px;
   }
   .sticky-bar-cta:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(139, 82, 238, 0.45);
+    box-shadow: 0 6px 22px rgba(139, 82, 238, 0.45);
   }
 
   /* ── Modal ── */
@@ -952,29 +954,27 @@ const BASE_STYLES = `<style>
   }
   .modal-close:hover { background: rgba(255,255,255,0.12); color: var(--text); }
 
+  /* Neutral by doctrine — gradient is reserved for hero CTAs only.
+     The icon's job here is wayfinding ("this is a save flow"), not brand. */
   .modal-icon-ring {
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    background: var(--brand-grad);
-    padding: 2px;
+    background: rgba(139, 82, 238, 0.12);
+    border: 1px solid rgba(139, 82, 238, 0.22);
     margin: 6px auto 18px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: var(--brand-purple);
   }
   .modal-icon-ring--success {
-    background: linear-gradient(135deg, #34D399, #10B981);
+    background: rgba(52, 211, 153, 0.12);
+    border-color: rgba(52, 211, 153, 0.28);
+    color: #34D399;
   }
-  .modal-icon-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    background: var(--surface);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+  .modal-icon-inner { display: contents; }
+  .modal-icon-inner svg path { stroke: currentColor; }
 
   .modal-title {
     font-family: 'Inter', sans-serif;
@@ -1021,20 +1021,23 @@ const BASE_STYLES = `<style>
     text-align: center;
     -webkit-tap-highlight-color: transparent;
   }
+  /* Companion CTA per ux-buttons.md §2 — ghost outline, no brand color. */
   .modal-btn-oauth {
-    background: rgba(255,255,255,0.06);
+    background: transparent;
     color: var(--text);
-    border: 1px solid var(--border);
+    border: 1.5px solid rgba(255, 255, 255, 0.18);
   }
   .modal-btn-oauth:hover {
-    background: rgba(255,255,255,0.1);
-    border-color: var(--border-hover);
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255, 255, 255, 0.28);
   }
+  /* Hero CTA per ux-buttons.md §1 — Fuchsia v2 gradient + soft sheen. */
   .modal-btn-primary {
     background: var(--brand-grad);
     color: white;
-    box-shadow: 0 4px 16px rgba(139, 82, 238, 0.3);
+    box-shadow: var(--brand-shadow);
     position: relative;
+    letter-spacing: 0.1px;
   }
   .modal-btn-primary:hover {
     transform: translateY(-1px);
