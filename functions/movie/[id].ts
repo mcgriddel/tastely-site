@@ -143,7 +143,6 @@ function renderMovie(a: RenderArgs): Response {
 
   const body = `
     <div class="detail-hero">
-      <p class="detail-eyebrow">Movie</p>
       ${posterUrl ? `<img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(a.title)}" class="detail-cover" />` : '<div class="detail-cover"></div>'}
       <h1 class="detail-title">${escapeHtml(a.title)}</h1>
       ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}

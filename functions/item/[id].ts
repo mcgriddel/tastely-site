@@ -22,10 +22,12 @@ type DbBook = {
     // S139 — multi-source cover registry written by the resolver at ingest.
     image_sources?: Array<{ url: string; source: string; priority: number; license?: string }>;
     // S139 NYT bestseller substrate — when present, NYT's `book_image` is
-    // higher-quality than the OL cover the resolver typically lands. Used as
-    // a fallback when the canonical `image_url` happens to point at OL's
-    // (sometimes wrong) ISBN cover.
+    // higher-quality than the OL cover the resolver typically lands.
     nyt_lists?: Array<{ book_image?: string; rank?: number }>;
+    // S140 — NYT bestseller substrate ships affiliate retailer links
+    // (Amazon, Apple Books, B&N, Books-A-Million, Bookshop.org).
+    // Surfacing on the share-landing per Mac's S140 polish punch list.
+    buy_links?: Array<{ name: string; url: string }>;
   } | null;
 };
 
@@ -152,6 +154,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       categories: item.metadata?.categories ?? [],
       pageCount: item.metadata?.pageCount ?? null,
       publisher: item.metadata?.publisher ?? '',
+      buyLinks: item.metadata?.buy_links ?? [],
       externalId: item.external_id,
       externalSource: item.external_source ?? 'unknown',
       ogUrl,
@@ -224,17 +227,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       const cover = (isOlCanonical && nytCover)
         ? nytCover
         : (dbRow.image_url || nytCover || fromChain || pickBestCover(info.imageLinks) || openLibraryCover(isbn));
+      // Prefer GB's full publisher description (matches in-app behavior —
+      // app's useBookDetail hook fetches from getBookDetail/googlebooks).
+      // Our DB row's description for NYT-ingested books is just the short
+      // bestseller blurb. Fall back to DB only if GB has nothing.
+      const description = info.description || dbRow.description || '';
       const sharer = await sharerPromise;
       return renderBook({
         title: dbRow.title,
         authors,
-        description: dbRow.description || info.description || '',
+        description,
         cover,
         fallbackCover: nytCover || pickBestCover(info.imageLinks) || openLibraryCover(isbn),
         publishedDate: dbRow.metadata?.publishedDate ?? info.publishedDate ?? '',
         categories: dbRow.metadata?.categories ?? info.categories ?? [],
         pageCount: dbRow.metadata?.pageCount ?? info.pageCount ?? null,
         publisher: dbRow.metadata?.publisher ?? info.publisher ?? '',
+        buyLinks: dbRow.metadata?.buy_links ?? [],
         externalId: dbRow.external_id,
         externalSource: dbRow.external_source ?? 'unknown',
         ogUrl,
@@ -256,6 +265,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       categories: info.categories ?? [],
       pageCount: info.pageCount ?? null,
       publisher: info.publisher ?? '',
+      buyLinks: [],
       externalId: volumeId,
       externalSource: 'googlebooks',
       ogUrl,
@@ -283,6 +293,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
           categories: [],
           pageCount: ol.number_of_pages ?? null,
           publisher: (ol.publishers && ol.publishers[0]) || '',
+          buyLinks: [],
           externalId: 'isbn-' + volumeId,
           externalSource: 'openlibrary',
           ogUrl,
@@ -307,6 +318,7 @@ type RenderArgs = {
   categories: string[];
   pageCount: number | null;
   publisher: string;
+  buyLinks: Array<{ name: string; url: string }>;
   externalId: string;
   externalSource: string;
   ogUrl: string;
@@ -354,9 +366,19 @@ function renderBook(a: RenderArgs): Response {
     ? `<img src="${escapeHtml(a.cover)}" alt="${escapeHtml(a.title)}" class="detail-cover" ${a.fallbackCover ? `onerror="this.onerror=null;this.src='${escapeHtml(a.fallbackCover)}'"` : ''} />`
     : '<div class="detail-cover"></div>';
 
+  const buyLinksHtml = a.buyLinks.length
+    ? `<div class="section">
+         <p class="section-label">Where to buy</p>
+         <div class="providers">
+           ${a.buyLinks
+             .map((b) => `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${escapeHtml(b.name)} <span class="provider-arrow" aria-hidden="true">↗</span></a>`)
+             .join('')}
+         </div>
+       </div>`
+    : '';
+
   const body = `
     <div class="detail-hero">
-      <p class="detail-eyebrow">Book</p>
       ${coverImg}
       <h1 class="detail-title">${escapeHtml(a.title)}</h1>
       ${allAuthors ? `<p class="detail-subtitle">by ${escapeHtml(allAuthors)}</p>` : ''}
@@ -387,6 +409,8 @@ function renderBook(a: RenderArgs): Response {
       <p class="section-label">About</p>
       <p class="section-prose">${escapeHtml(cleanDesc)}</p>
     </div>` : ''}
+
+    ${buyLinksHtml}
 
     ${categoriesHtml}
   `;

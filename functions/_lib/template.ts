@@ -173,8 +173,6 @@ function renderSharerRow(p: SharerProfile): string {
 function renderTrustFooter(): string {
   return `
     <footer class="trust-footer">
-      <p class="trust-line">Powered by <span>TMDB</span> · <span>Open Library</span> · <span>Wikidata</span></p>
-      <a href="/" class="trust-discover">Discover more on Tastely <span aria-hidden="true">→</span></a>
       <p class="trust-copyright">© 2026 Tastely</p>
     </footer>`;
 }
@@ -515,7 +513,7 @@ const BASE_STYLES = `<style>
     max-width: 560px;
     margin: 0 auto;
   }
-  .chrome-logo img { display: block; height: 30px; width: auto; opacity: 0.95; }
+  .chrome-logo img { display: block; height: 38px; width: auto; opacity: 0.95; }
   .chrome-signin {
     font-family: 'Inter', sans-serif;
     font-weight: 500;
@@ -687,13 +685,13 @@ const BASE_STYLES = `<style>
   }
   .detail-meta .dot { margin: 0 6px; opacity: 0.6; }
 
-  /* ── Action pills row ── */
+  /* ── Action pills row — single row on phone ── */
   .actions {
     display: flex;
     gap: 8px;
     justify-content: center;
-    margin: 18px -4px 28px;
-    flex-wrap: wrap;
+    margin: 18px 0 28px;
+    flex-wrap: nowrap;
   }
   .pill {
     appearance: none;
@@ -703,14 +701,18 @@ const BASE_STYLES = `<style>
     font-family: 'Inter', sans-serif;
     font-weight: 500;
     font-size: 13px;
-    padding: 10px 16px;
+    padding: 9px 12px;
     border-radius: 999px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
+    gap: 5px;
     cursor: pointer;
     transition: all 0.18s ease;
     -webkit-tap-highlight-color: transparent;
+    flex: 1 1 0;
+    min-width: 0;
+    white-space: nowrap;
   }
   .pill:hover {
     color: var(--text);
@@ -718,7 +720,7 @@ const BASE_STYLES = `<style>
     border-color: var(--border-hover);
     transform: translateY(-1px);
   }
-  .pill svg { width: 14px; height: 14px; }
+  .pill svg { width: 14px; height: 14px; flex-shrink: 0; }
 
   /* ── Body sections ── */
   .section { margin: 28px 0; }
@@ -796,20 +798,21 @@ const BASE_STYLES = `<style>
   .providers {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
   }
   .provider-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 8px 14px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
     font-weight: 500;
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--text-2);
+    transition: all 0.18s ease;
   }
   .provider-chip img {
     width: 16px;
@@ -817,37 +820,32 @@ const BASE_STYLES = `<style>
     border-radius: 4px;
     object-fit: cover;
   }
+  .provider-chip--link {
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .provider-chip--link:hover {
+    background: var(--surface-alt);
+    border-color: var(--border-hover);
+    color: var(--text);
+    transform: translateY(-1px);
+  }
+  .provider-arrow {
+    color: var(--text-4);
+    font-size: 11px;
+  }
+  .provider-chip--link:hover .provider-arrow {
+    color: var(--brand-purple);
+  }
 
   /* ── Trust footer ── */
   .trust-footer {
     margin-top: 48px;
-    padding-top: 28px;
+    padding-top: 24px;
     border-top: 1px solid var(--border);
     text-align: center;
   }
-  .trust-line {
-    font-family: 'Outfit', sans-serif;
-    font-weight: 300;
-    font-size: 12px;
-    color: var(--text-4);
-    letter-spacing: 0.4px;
-  }
-  .trust-line span {
-    color: var(--text-3);
-    font-weight: 500;
-  }
-  .trust-discover {
-    display: inline-block;
-    margin-top: 18px;
-    font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    font-size: 13px;
-    color: var(--text-2);
-    transition: color 0.18s ease;
-  }
-  .trust-discover:hover { color: var(--brand-pink); }
   .trust-copyright {
-    margin-top: 16px;
     font-family: 'Outfit', sans-serif;
     font-size: 11px;
     color: var(--text-4);
