@@ -418,12 +418,14 @@ function renderBook(a: RenderArgs): Response {
   //         wordmark IS the brand identity, text would be redundant)
   // Refresh by re-running the Brand API lookup if a logo ever 404s.
   // Map keys = lowercase NYT retailer names.
-  type RetailerLogo = { url: string; shape: 'icon' | 'wordmark' };
+  // `inset: true` adds internal padding for full-bleed marks that would
+  // otherwise clip into the rounded-square edges (e.g. B&N's local PNG).
+  type RetailerLogo = { url: string; shape: 'icon' | 'wordmark'; inset?: boolean };
   const RETAILER_LOGO: Record<string, RetailerLogo> = {
     'amazon':           { url: 'https://cdn.brandfetch.io/idawOgYOsG/theme/dark/symbol.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
     'apple books':      { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
     'apple':            { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'barnes & noble':   { url: '/retailers/barnesandnoble.png', shape: 'icon' },
+    'barnes & noble':   { url: '/retailers/barnesandnoble.png', shape: 'icon', inset: true },
     'books-a-million':  { url: 'https://cdn.brandfetch.io/idpqzOZXsi/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
     'bookshop.org':     { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
     'bookshop':         { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
@@ -464,7 +466,8 @@ function renderBook(a: RenderArgs): Response {
                  return `<a class="provider-chip provider-chip--link provider-chip--wordmark" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener" aria-label="Buy on ${escapeAttr(b.name)}"><img src="${escapeAttr(logo.url)}" alt="${escapeAttr(b.name)}" class="provider-wordmark" loading="lazy" /></a>`;
                }
                // icon shape — combines with brand-name text
-               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener"><img src="${escapeAttr(logo.url)}" alt="" class="provider-icon" loading="lazy" />${escapeHtml(b.name)}</a>`;
+               const iconClass = logo.inset ? 'provider-icon provider-icon--inset' : 'provider-icon';
+               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener"><img src="${escapeAttr(logo.url)}" alt="" class="${iconClass}" loading="lazy" />${escapeHtml(b.name)}</a>`;
              })
              .join('')}
          </div>

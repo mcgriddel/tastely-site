@@ -843,6 +843,12 @@ const BASE_STYLES = `<style>
     object-fit: contain;
     flex-shrink: 0;
   }
+  /* For full-bleed marks (B&N's local PNG) — pull the visible logo
+     inset from the rounded-square edges so it doesn't read as clipped. */
+  .provider-icon--inset {
+    padding: 3px;
+    box-sizing: border-box;
+  }
   /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
      alongside (wordmark already shows the brand name). */
   .provider-wordmark {
