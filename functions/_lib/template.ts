@@ -843,13 +843,14 @@ const BASE_STYLES = `<style>
     object-fit: contain;
     flex-shrink: 0;
   }
-  /* For source PNGs whose mark sits inside the canvas with internal
-     whitespace (B&N is the current case) — visually scale up so the
-     mark reads at the same prominence as Brandfetch's tight-cropped
-     icons (Apple, BAM, Amazon). Long-term fix is a re-cropped asset. */
+  /* Some marks (B&N's local PNG) are cropped tight to the letter edges,
+     so the rounded-square corners clip into the artwork. Pad enough to
+     clear the 5px corner curve and let the letters breathe inside the
+     rounded shape — comparable visual mass to Apple/BAM (whose rounded
+     shape is baked into the source). */
   .provider-icon--inset {
-    transform: scale(1.35);
-    border-radius: 0;
+    padding: 4px;
+    box-sizing: border-box;
   }
   /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
      alongside (wordmark already shows the brand name). */
