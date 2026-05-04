@@ -350,17 +350,11 @@ function renderBook(a: RenderArgs): Response {
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
     : '';
 
-  const categoriesHtml = a.categories.length
-    ? `<div class="section">
-         <p class="section-label">Categories</p>
-         <div class="providers">
-           ${a.categories
-             .slice(0, 5)
-             .map((c) => `<span class="provider-chip">${escapeHtml(c)}</span>`)
-             .join('')}
-         </div>
-       </div>`
-    : '';
+  // Categories suppressed per Mac's S140 polish call — Google Books'
+  // categories are noisy ("Fiction / Literary", "Fiction / Romance / Small
+  // Town & Rural", etc.) and don't add receiver-page value. Re-enable by
+  // restoring this block + the `${categoriesHtml}` reference below.
+  const categoriesHtml = '';
 
   const coverImg = a.cover
     ? `<img src="${escapeHtml(a.cover)}" alt="${escapeHtml(a.title)}" class="detail-cover" ${a.fallbackCover ? `onerror="this.onerror=null;this.src='${escapeHtml(a.fallbackCover)}'"` : ''} />`
