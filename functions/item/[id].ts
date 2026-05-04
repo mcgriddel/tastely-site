@@ -400,7 +400,7 @@ function renderBook(a: RenderArgs): Response {
     'amazon':           { url: 'https://cdn.brandfetch.io/idawOgYOsG/theme/dark/symbol.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
     'apple books':      { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
     'apple':            { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'barnes & noble':   { url: 'https://cdn.brandfetch.io/idgIQbld-a/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
+    'barnes & noble':   { url: '/retailers/barnesandnoble.jpg', shape: 'icon' },
     'books-a-million':  { url: 'https://cdn.brandfetch.io/idpqzOZXsi/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
     'bookshop.org':     { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
     'bookshop':         { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
