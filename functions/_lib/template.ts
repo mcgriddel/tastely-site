@@ -843,11 +843,13 @@ const BASE_STYLES = `<style>
     object-fit: contain;
     flex-shrink: 0;
   }
-  /* For full-bleed marks (B&N's local PNG) — pull the visible logo
-     inset from the rounded-square edges so it doesn't read as clipped. */
+  /* For source PNGs whose mark sits inside the canvas with internal
+     whitespace (B&N is the current case) — visually scale up so the
+     mark reads at the same prominence as Brandfetch's tight-cropped
+     icons (Apple, BAM, Amazon). Long-term fix is a re-cropped asset. */
   .provider-icon--inset {
-    padding: 3px;
-    box-sizing: border-box;
+    transform: scale(1.35);
+    border-radius: 0;
   }
   /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
      alongside (wordmark already shows the brand name). */
