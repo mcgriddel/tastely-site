@@ -804,7 +804,7 @@ const BASE_STYLES = `<style>
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    padding: 7px 16px 7px 7px;
+    padding: 8px 16px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 999px;
@@ -815,26 +815,17 @@ const BASE_STYLES = `<style>
     transition: all 0.18s ease;
     line-height: 1;
   }
-  /* iOS-app-icon-style retailer mark — brand color + 1-2 letter monogram
-     + inset sheen for depth. Uniform across retailers, no logo CDN needed. */
-  .provider-mark {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+  /* Real brand logos via Brandfetch — fixed height, auto width.
+     Wordmarks (Amazon, B&N, Bookshop, Kobo) are wider; icons (Apple,
+     BAM, Audible) are square. Chip naturally accommodates either. */
+  .provider-logo {
+    height: 18px;
+    width: auto;
+    max-width: 90px;
+    object-fit: contain;
     flex-shrink: 0;
-    color: white;
-    font-family: 'Inter', sans-serif;
-    font-weight: 800;
-    font-size: 13px;
-    letter-spacing: -0.5px;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.25),
-      inset 0 -1px 1px rgba(0, 0, 0, 0.18),
-      0 1px 2px rgba(0, 0, 0, 0.4);
   }
+  .provider-name { line-height: 1; }
   .provider-chip--link {
     text-decoration: none;
     cursor: pointer;

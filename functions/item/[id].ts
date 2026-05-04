@@ -360,33 +360,32 @@ function renderBook(a: RenderArgs): Response {
     ? `<img src="${escapeHtml(a.cover)}" alt="${escapeHtml(a.title)}" class="detail-cover" ${a.fallbackCover ? `onerror="this.onerror=null;this.src='${escapeHtml(a.fallbackCover)}'"` : ''} />`
     : '<div class="detail-cover"></div>';
 
-  // iOS-app-icon-style retailer marks — brand color + 1-2 letter monogram.
-  // Uniform across retailers (no logo CDN dependency, no quality drift on
-  // unknown retailers). Each entry = { color, glyph }. New retailers fall
-  // back to a neutral mark + first letter so we never render a broken icon.
-  const RETAILER_MARK: Record<string, { color: string; glyph: string }> = {
-    'amazon':           { color: '#FF9900', glyph: 'a' },
-    'apple books':      { color: '#FA243C', glyph: 'A' },
-    'apple':            { color: '#FA243C', glyph: 'A' },
-    'barnes & noble':   { color: '#157A4E', glyph: '&' },
-    'books-a-million':  { color: '#0F4C81', glyph: 'M' },
-    'bookshop.org':     { color: '#3F4046', glyph: 'B' },
-    'bookshop':         { color: '#3F4046', glyph: 'B' },
-    'audible':          { color: '#F59B00', glyph: 'A' },
-    'kobo':             { color: '#E84F26', glyph: 'K' },
-    'indigo':           { color: '#1D3F8C', glyph: 'i' },
-    'target':           { color: '#CC0000', glyph: 'T' },
-    'walmart':          { color: '#0071CE', glyph: 'W' },
+  // S140 — retailer logos sourced from Brandfetch CDN (real brand assets).
+  // URLs pre-fetched once via Brand API + hardcoded so the function does
+  // zero runtime API calls (stays under free-tier limits permanently and
+  // resilient to Brandfetch availability). The embedded `c=` token in
+  // each URL is Brandfetch's per-brand CDN auth, designed for hotlinking.
+  // Refresh by re-running the Brand API lookup if a logo ever 404s.
+  // Map keys = lowercase NYT retailer names.
+  const RETAILER_LOGO: Record<string, string> = {
+    'amazon':           'https://cdn.brandfetch.io/idawOgYOsG/theme/light/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'apple books':      'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'apple':            'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'barnes & noble':   'https://cdn.brandfetch.io/idgIQbld-a/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'books-a-million':  'https://cdn.brandfetch.io/idpqzOZXsi/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'bookshop.org':     'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'bookshop':         'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'audible':          'https://cdn.brandfetch.io/idT82q9yNb/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+    'kobo':             'https://cdn.brandfetch.io/id3tDnj0HA/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
   };
 
-  function markFor(name: string): { color: string; glyph: string } {
+  function logoFor(name: string): string {
     const key = name.toLowerCase().trim();
-    if (RETAILER_MARK[key]) return RETAILER_MARK[key];
-    // Fuzzy: any key that's contained in or contains the name
-    for (const k of Object.keys(RETAILER_MARK)) {
-      if (key.includes(k) || k.includes(key)) return RETAILER_MARK[k];
+    if (RETAILER_LOGO[key]) return RETAILER_LOGO[key];
+    for (const k of Object.keys(RETAILER_LOGO)) {
+      if (key.includes(k) || k.includes(key)) return RETAILER_LOGO[k];
     }
-    return { color: '#3F4046', glyph: name.charAt(0).toUpperCase() || 'B' };
+    return ''; // unknown retailer → text-only chip
   }
 
   const buyLinksHtml = a.buyLinks.length
@@ -395,11 +394,11 @@ function renderBook(a: RenderArgs): Response {
          <div class="providers">
            ${a.buyLinks
              .map((b) => {
-               const m = markFor(b.name);
-               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">
-                 <span class="provider-mark" style="background:${m.color}">${escapeHtml(m.glyph)}</span>
-                 ${escapeHtml(b.name)}
-               </a>`;
+               const logo = logoFor(b.name);
+               const logoTag = logo
+                 ? `<img src="${escapeAttr(logo)}" alt="" class="provider-logo" loading="lazy" />`
+                 : '';
+               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${logoTag}<span class="provider-name">${escapeHtml(b.name)}</span></a>`;
              })
              .join('')}
          </div>
