@@ -815,15 +815,26 @@ const BASE_STYLES = `<style>
     transition: all 0.18s ease;
     line-height: 1;
   }
-  /* Real brand logos via Brandfetch — fixed height, auto width.
-     Wordmarks (Amazon, B&N, Bookshop, Kobo) are wider; icons (Apple,
-     BAM, Audible) are square. Chip naturally accommodates either. */
-  .provider-logo {
-    height: 18px;
-    width: auto;
-    max-width: 90px;
+  /* Icon-shape logos (Amazon symbol, Apple icon, BAM icon) — square,
+     paired with brand-name text. */
+  .provider-icon {
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
     object-fit: contain;
     flex-shrink: 0;
+  }
+  /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
+     alongside (wordmark already shows the brand name). */
+  .provider-wordmark {
+    height: 18px;
+    width: auto;
+    max-width: 130px;
+    object-fit: contain;
+    display: block;
+  }
+  .provider-chip--wordmark {
+    padding: 9px 16px;
   }
   .provider-name { line-height: 1; }
   .provider-chip--link {

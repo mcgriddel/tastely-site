@@ -365,27 +365,32 @@ function renderBook(a: RenderArgs): Response {
   // zero runtime API calls (stays under free-tier limits permanently and
   // resilient to Brandfetch availability). The embedded `c=` token in
   // each URL is Brandfetch's per-brand CDN auth, designed for hotlinking.
+  //
+  // shape: 'icon' = square symbol/icon (combines well with brand-name text)
+  //        'wordmark' = full brand wordmark (renders alone, no text — the
+  //         wordmark IS the brand identity, text would be redundant)
   // Refresh by re-running the Brand API lookup if a logo ever 404s.
   // Map keys = lowercase NYT retailer names.
-  const RETAILER_LOGO: Record<string, string> = {
-    'amazon':           'https://cdn.brandfetch.io/idawOgYOsG/theme/light/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'apple books':      'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'apple':            'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'barnes & noble':   'https://cdn.brandfetch.io/idgIQbld-a/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'books-a-million':  'https://cdn.brandfetch.io/idpqzOZXsi/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'bookshop.org':     'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'bookshop':         'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'audible':          'https://cdn.brandfetch.io/idT82q9yNb/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
-    'kobo':             'https://cdn.brandfetch.io/id3tDnj0HA/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT',
+  type RetailerLogo = { url: string; shape: 'icon' | 'wordmark' };
+  const RETAILER_LOGO: Record<string, RetailerLogo> = {
+    'amazon':           { url: 'https://cdn.brandfetch.io/idawOgYOsG/theme/dark/symbol.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
+    'apple books':      { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
+    'apple':            { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
+    'barnes & noble':   { url: 'https://cdn.brandfetch.io/idgIQbld-a/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
+    'books-a-million':  { url: 'https://cdn.brandfetch.io/idpqzOZXsi/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
+    'bookshop.org':     { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
+    'bookshop':         { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
+    'audible':          { url: 'https://cdn.brandfetch.io/idT82q9yNb/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
+    'kobo':             { url: 'https://cdn.brandfetch.io/id3tDnj0HA/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
   };
 
-  function logoFor(name: string): string {
+  function logoFor(name: string): RetailerLogo | null {
     const key = name.toLowerCase().trim();
     if (RETAILER_LOGO[key]) return RETAILER_LOGO[key];
     for (const k of Object.keys(RETAILER_LOGO)) {
       if (key.includes(k) || k.includes(key)) return RETAILER_LOGO[k];
     }
-    return ''; // unknown retailer → text-only chip
+    return null;
   }
 
   const buyLinksHtml = a.buyLinks.length
@@ -395,10 +400,16 @@ function renderBook(a: RenderArgs): Response {
            ${a.buyLinks
              .map((b) => {
                const logo = logoFor(b.name);
-               const logoTag = logo
-                 ? `<img src="${escapeAttr(logo)}" alt="" class="provider-logo" loading="lazy" />`
-                 : '';
-               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${logoTag}<span class="provider-name">${escapeHtml(b.name)}</span></a>`;
+               if (!logo) {
+                 // unknown retailer → text-only chip (safe fallback)
+                 return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${escapeHtml(b.name)}</a>`;
+               }
+               if (logo.shape === 'wordmark') {
+                 // wordmark IS the brand — render alone, no text alongside
+                 return `<a class="provider-chip provider-chip--link provider-chip--wordmark" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener" aria-label="Buy on ${escapeAttr(b.name)}"><img src="${escapeAttr(logo.url)}" alt="${escapeAttr(b.name)}" class="provider-wordmark" loading="lazy" /></a>`;
+               }
+               // icon shape — combines with brand-name text
+               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener"><img src="${escapeAttr(logo.url)}" alt="" class="provider-icon" loading="lazy" />${escapeHtml(b.name)}</a>`;
              })
              .join('')}
          </div>
