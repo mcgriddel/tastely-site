@@ -739,6 +739,11 @@ const BASE_STYLES = `<style>
     font-size: 15px;
     line-height: 1.65;
     color: var(--text-2);
+    /* Preserve paragraph/line breaks from book descriptions (review
+       quotes vs synopsis). Source descriptions arrive with <br>/<p>
+       which we convert to \n; pre-line renders \n as line breaks
+       without preserving multi-spaces. */
+    white-space: pre-line;
   }
 
   /* ── Cast / similar / providers strips ── */

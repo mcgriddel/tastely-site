@@ -349,6 +349,23 @@ type RenderArgs = {
   sharer: Awaited<ReturnType<typeof lookupSharer>>;
 };
 
+// Strip HTML from a description but preserve paragraph/line breaks as
+// newlines. Google Books descriptions arrive with <br>, <p>, etc.
+// separating review-quote blocks from the synopsis; naive tag-stripping
+// runs words together (e.g. "KotbOne"). Output renders cleanly when the
+// element has `white-space: pre-line`.
+function stripHtmlPreservingBreaks(html: string): string {
+  return html
+    .replace(/<\s*br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])\s*>/gi, '\n\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
 function renderBook(a: RenderArgs): Response {
   const year = a.publishedDate ? a.publishedDate.slice(0, 4) : '';
   const authorStr = a.authors[0] ?? '';
@@ -356,9 +373,12 @@ function renderBook(a: RenderArgs): Response {
   const pagesStr = a.pageCount ? `${a.pageCount} pages` : '';
 
   const ogTitle = authorStr ? `${a.title} by ${authorStr}` : a.title;
-  const cleanDesc = a.description ? a.description.replace(/<[^>]+>/g, '') : '';
-  const ogDescription = cleanDesc
-    ? cleanDesc.slice(0, 150) + (cleanDesc.length > 150 ? '…' : '')
+  const cleanDesc = a.description ? stripHtmlPreservingBreaks(a.description) : '';
+  // OG description doesn't want line breaks (iMessage / unfurlers render
+  // it as a single line). Collapse newlines for the meta tag only.
+  const ogDescriptionSrc = cleanDesc.replace(/\s*\n+\s*/g, ' ');
+  const ogDescription = ogDescriptionSrc
+    ? ogDescriptionSrc.slice(0, 150) + (ogDescriptionSrc.length > 150 ? '…' : '')
     : 'Discover this book on Tastely';
 
   const modalContext: ModalContext = {
