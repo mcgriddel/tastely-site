@@ -366,12 +366,39 @@ function renderBook(a: RenderArgs): Response {
     ? `<img src="${escapeHtml(a.cover)}" alt="${escapeHtml(a.title)}" class="detail-cover" ${a.fallbackCover ? `onerror="this.onerror=null;this.src='${escapeHtml(a.fallbackCover)}'"` : ''} />`
     : '<div class="detail-cover"></div>';
 
+  // Domain → DuckDuckGo favicon CDN. Handles any retailer (Amazon, B&N,
+  // Bookshop, Books-A-Million, and any future NYT additions like Indigo)
+  // without needing a per-brand lookup. Strips affiliate-redirect wrappers
+  // (e.g. anrdoezrs.net for Books-A-Million) by walking the URL chain.
+  function logoFor(linkUrl: string): string {
+    try {
+      const u = new URL(linkUrl);
+      // Many affiliate links are tracker-prefixed (anrdoezrs, sjv.io). Try
+      // to find the real destination domain in the URL path/query.
+      const host = u.hostname.replace(/^www\./, '');
+      // Look for a known affiliate-tracker; if found, scan the URL for
+      // the actual retailer hostname embedded in path/query.
+      const trackerHosts = ['anrdoezrs.net', 'sjv.io', 'goto.applebooks.apple', 'barnesandnoble.sjv.io'];
+      if (trackerHosts.some((t) => host.includes(t))) {
+        const m = linkUrl.match(/(?:https?[%:]\/\/|www\.)([a-z0-9-]+\.(?:com|org|net|co\.uk))/i);
+        if (m) return `https://icons.duckduckgo.com/ip3/${m[1].replace(/^www\./, '')}.ico`;
+      }
+      return `https://icons.duckduckgo.com/ip3/${host}.ico`;
+    } catch {
+      return '';
+    }
+  }
+
   const buyLinksHtml = a.buyLinks.length
     ? `<div class="section">
          <p class="section-label">Where to buy</p>
          <div class="providers">
            ${a.buyLinks
-             .map((b) => `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${escapeHtml(b.name)} <span class="provider-arrow" aria-hidden="true">↗</span></a>`)
+             .map((b) => {
+               const logo = logoFor(b.url);
+               const logoTag = logo ? `<img src="${escapeAttr(logo)}" alt="" class="provider-logo" loading="lazy" />` : '';
+               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${logoTag}${escapeHtml(b.name)}<span class="provider-arrow" aria-hidden="true">↗</span></a>`;
+             })
              .join('')}
          </div>
        </div>`

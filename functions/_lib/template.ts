@@ -513,7 +513,7 @@ const BASE_STYLES = `<style>
     max-width: 560px;
     margin: 0 auto;
   }
-  .chrome-logo img { display: block; height: 38px; width: auto; opacity: 0.95; }
+  .chrome-logo img { display: block; height: 70px; width: auto; opacity: 0.95; }
   .chrome-signin {
     font-family: 'Inter', sans-serif;
     font-weight: 500;
@@ -803,22 +803,25 @@ const BASE_STYLES = `<style>
   .provider-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 14px;
+    gap: 8px;
+    padding: 8px 14px 8px 8px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
-    font-weight: 500;
-    font-size: 12.5px;
-    color: var(--text-2);
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--text);
     transition: all 0.18s ease;
+    line-height: 1;
   }
-  .provider-chip img {
-    width: 16px;
-    height: 16px;
-    border-radius: 4px;
+  .provider-logo {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     object-fit: cover;
+    background: white;
+    flex-shrink: 0;
   }
   .provider-chip--link {
     text-decoration: none;
@@ -827,12 +830,13 @@ const BASE_STYLES = `<style>
   .provider-chip--link:hover {
     background: var(--surface-alt);
     border-color: var(--border-hover);
-    color: var(--text);
     transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
   }
   .provider-arrow {
     color: var(--text-4);
     font-size: 11px;
+    margin-left: 2px;
   }
   .provider-chip--link:hover .provider-arrow {
     color: var(--brand-purple);
