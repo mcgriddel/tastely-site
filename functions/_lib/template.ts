@@ -510,12 +510,12 @@ const BASE_STYLES = `<style>
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 20px calc(16px + env(safe-area-inset-top, 0px));
-    padding-top: max(16px, env(safe-area-inset-top, 16px));
+    padding: 18px 20px;
+    padding-top: max(18px, env(safe-area-inset-top, 18px));
     max-width: 560px;
     margin: 0 auto;
   }
-  .chrome-logo img { display: block; height: 22px; width: auto; opacity: 0.95; }
+  .chrome-logo img { display: block; height: 30px; width: auto; opacity: 0.95; }
   .chrome-signin {
     font-family: 'Inter', sans-serif;
     font-weight: 500;

@@ -171,6 +171,47 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   if (gb && gb.volumeInfo) {
     const info = gb.volumeInfo;
     const isbn = pickIsbn(info.industryIdentifiers);
+
+    // S140 — second-chance DB lookup by ISBN. The multi-shape lookup at the
+    // top of this function only knows the volume_id; we now have the ISBN
+    // GB gave us. If our DB has a row under `isbn-{isbn}` (NYT-ingested
+    // book), prefer DB metadata (NYT covers, image_sources chain, etc.)
+    // over what GB returns. Closes the gap that drove Theo of Golden to
+    // render with OL's broken ISBN cover even though we had the right NYT
+    // cover sitting in metadata of the matching row.
+    if (isbn) {
+      const isbnRow = await sbFetchOne<DbBook>(env, {
+        path: `items?external_id=eq.${encodeURIComponent('isbn-' + isbn)}&item_type=eq.book&select=title,description,image_url,external_id,external_source,metadata&limit=1`,
+        key: 'service',
+      });
+      if (isbnRow) {
+        const authors = isbnRow.metadata?.authors ?? info.authors ?? [];
+        const fromChain = pickFromImageSources(isbnRow.metadata?.image_sources);
+        const nytCover = isbnRow.metadata?.nyt_lists?.[0]?.book_image ?? '';
+        const isOlCanonical = (isbnRow.image_url ?? '').includes('covers.openlibrary.org');
+        const cover = (isOlCanonical && nytCover)
+          ? nytCover
+          : (isbnRow.image_url || nytCover || fromChain || pickBestCover(info.imageLinks) || openLibraryCover(isbn));
+        const sharer = await sharerPromise;
+        return renderBook({
+          title: isbnRow.title,
+          authors,
+          description: isbnRow.description || info.description || '',
+          cover,
+          fallbackCover: nytCover || pickBestCover(info.imageLinks) || openLibraryCover(isbn),
+          publishedDate: isbnRow.metadata?.publishedDate ?? info.publishedDate ?? '',
+          categories: isbnRow.metadata?.categories ?? info.categories ?? [],
+          pageCount: isbnRow.metadata?.pageCount ?? info.pageCount ?? null,
+          publisher: isbnRow.metadata?.publisher ?? info.publisher ?? '',
+          externalId: isbnRow.external_id,
+          externalSource: isbnRow.external_source ?? 'unknown',
+          ogUrl,
+          sharer,
+        });
+      }
+    }
+
+    // Pure GB render (no DB row found by either path)
     const cover = pickBestCover(info.imageLinks) || openLibraryCover(isbn);
     const sharer = await sharerPromise;
 
