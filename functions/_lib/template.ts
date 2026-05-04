@@ -873,13 +873,19 @@ const BASE_STYLES = `<style>
   .provider-chip--link:active {
     transform: translateY(0);
   }
-  /* JustWatch attribution — TMDB ToS requires this near watch-provider chips. */
-  .watch-attribution {
-    font-family: 'Outfit', sans-serif;
-    font-size: 11px;
-    color: var(--text-4);
-    margin-top: 10px;
-    letter-spacing: 0.02em;
+  /* Watch-provider variant — informational, not a CTA. Slimmer than the
+     book retailer chips (which are the primary action on book pages). */
+  .provider-chip--watch {
+    padding: 6px 14px 6px 6px;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+  .provider-icon--watch {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 5px;
   }
 
   /* ── Trust footer ── */

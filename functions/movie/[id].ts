@@ -177,12 +177,15 @@ function renderMovie(a: RenderArgs): Response {
     saveCtaLabel: `Save ${a.title} to your watchlist`,
   };
 
-  const metaParts = [year, runtimeStr, a.director, ...a.genres.slice(0, 2)].filter(Boolean);
+  // Year/runtime/director are sequential metadata (dot-separated).
+  // Genres are peer categories — joined by slash, then folded as one
+  // segment onto the dot-separated meta line.
+  const genreSegment = a.genres.slice(0, 2).filter(Boolean).join(' / ');
+  const metaParts = [year, runtimeStr, a.director, genreSegment].filter(Boolean);
   const metaLine = metaParts.length
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
     : '';
 
-  // TMDB requires JustWatch attribution alongside watch-provider data.
   const watchHtml = a.watchProviders && a.watchProviders.providers.length
     ? `<div class="section">
          <p class="section-label">Where to watch</p>
@@ -190,14 +193,13 @@ function renderMovie(a: RenderArgs): Response {
            ${a.watchProviders.providers
              .slice(0, 8)
              .map(
-               (p) => `<a class="provider-chip provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
-                 <img class="provider-icon" src="${TMDB_IMAGE_BASE}/w92${escapeHtml(p.logo_path)}" alt="${escapeHtml(p.provider_name)}" loading="lazy" />
+               (p) => `<a class="provider-chip provider-chip--watch provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
+                 <img class="provider-icon provider-icon--watch" src="${TMDB_IMAGE_BASE}/w92${escapeHtml(p.logo_path)}" alt="${escapeHtml(p.provider_name)}" loading="lazy" />
                  <span class="provider-name">${escapeHtml(p.provider_name)}</span>
                </a>`,
              )
              .join('')}
          </div>
-         <p class="watch-attribution">via JustWatch</p>
        </div>`
     : '';
 
