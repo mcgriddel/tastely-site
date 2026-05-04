@@ -255,8 +255,8 @@ function renderSignupModal(): string {
               </svg>
             </div>
           </div>
-          <h2 class="modal-title">Got it.</h2>
-          <p class="modal-subtitle">Your save is waiting. Get the Tastely app and sign up with this email — your library picks up where you left off.</p>
+          <h2 class="modal-title">Saved.</h2>
+          <p class="modal-subtitle">Sign up to Tastely with this email to access your library.</p>
           <a href="https://apps.apple.com/app/tastely/id${APP_STORE_ID}" class="modal-btn modal-btn-primary modal-btn-block" data-share-event="modal_get_app_after_capture">Get the Tastely app</a>
         </div>
 
