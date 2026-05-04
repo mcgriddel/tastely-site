@@ -360,7 +360,7 @@ function renderModalScript(ctx: ModalContext): string {
   var ACTION_ICONS = {
     save:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>',
     board: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="2"/><path d="M12 8V16M8 12H16" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>',
-    send:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>',
+    send:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="white" stroke-width="2" stroke-linejoin="round" transform="translate(-3 0)"/></svg>',
     share: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     rate:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 2L14.4 9.4L22 9.4L15.8 14L18.2 21.4L12 16.8L5.8 21.4L8.2 14L2 9.4L9.6 9.4L12 2Z" stroke="white" stroke-width="1.5" stroke-linejoin="round"/></svg>'
   };
