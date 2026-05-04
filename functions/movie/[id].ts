@@ -124,21 +124,9 @@ function renderMovie(a: RenderArgs): Response {
     saveCtaLabel: `Save ${a.title} to your watchlist`,
   };
 
-  const metaParts = [year, runtimeStr, a.director].filter(Boolean);
+  const metaParts = [year, runtimeStr, a.director, ...a.genres.slice(0, 2)].filter(Boolean);
   const metaLine = metaParts.length
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
-    : '';
-
-  const genresHtml = a.genres.length
-    ? `<div class="section">
-         <p class="section-label">Genres</p>
-         <div class="providers">
-           ${a.genres
-             .slice(0, 6)
-             .map((g) => `<span class="provider-chip">${escapeHtml(g)}</span>`)
-             .join('')}
-         </div>
-       </div>`
     : '';
 
   const body = `
@@ -172,8 +160,6 @@ function renderMovie(a: RenderArgs): Response {
       <p class="section-label">About</p>
       <p class="section-prose">${escapeHtml(a.description)}</p>
     </div>` : ''}
-
-    ${genresHtml}
   `;
 
   const html = renderPage({
