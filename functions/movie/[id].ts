@@ -4,6 +4,22 @@ import { lookupSharer } from '../_lib/sharer';
 
 type Env = SupabaseEnv & { TMDB_API_KEY?: string };
 
+type CachedWatchProvider = {
+  logoPath?: string;
+  providerName?: string;
+  providerId?: number;
+};
+
+type CachedWatchProvidersByRegion = Record<
+  string,
+  {
+    flatrate?: CachedWatchProvider[];
+    rent?: CachedWatchProvider[];
+    buy?: CachedWatchProvider[];
+    fetched_at?: string;
+  }
+>;
+
 type DbMovie = {
   title: string;
   description: string | null;
@@ -15,6 +31,7 @@ type DbMovie = {
     voteAverage?: number;
     director?: string;
     genres?: string[];
+    watch_providers?: CachedWatchProvidersByRegion;
   } | null;
 };
 
@@ -45,12 +62,56 @@ type TmdbWatchProvidersResponse = {
   results: Record<string, WatchProvidersForRegion | undefined>;
 };
 
+type ResolvedProvider = { logoUrl: string; providerName: string };
+
 type WatchProvidersOut = {
-  providers: TmdbWatchProvider[];
+  providers: ResolvedProvider[];
   tmdbLink: string;
 } | null;
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
+
+// Pick the most actionable list — flatrate (subscription) wins, then rent,
+// then buy. A movie that's not on any streaming service still surfaces its
+// rent/buy options rather than rendering an empty section.
+function pickProviderList<T>(region: { flatrate?: T[]; rent?: T[]; buy?: T[] } | undefined): T[] {
+  if (!region) return [];
+  if (region.flatrate?.length) return region.flatrate;
+  if (region.rent?.length) return region.rent;
+  if (region.buy?.length) return region.buy;
+  return [];
+}
+
+function logoUrlFromPath(path?: string): string | null {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `${TMDB_IMAGE_BASE}/w92${path}`;
+}
+
+// First preference — read from the cached metadata.watch_providers if the
+// items row already has it (saves a TMDB API call AND captures rent/buy
+// shapes the live-fetch flatrate filter discards).
+function watchProvidersFromCache(
+  cache: CachedWatchProvidersByRegion | undefined,
+  country: string,
+  tmdbId: string,
+): WatchProvidersOut {
+  if (!cache) return null;
+  const region = cache[country] ?? cache.US;
+  if (!region) return null;
+  const list = pickProviderList(region);
+  if (!list.length) return null;
+  const providers: ResolvedProvider[] = [];
+  for (const p of list) {
+    const logoUrl = logoUrlFromPath(p.logoPath);
+    if (!logoUrl || !p.providerName) continue;
+    providers.push({ logoUrl, providerName: p.providerName });
+  }
+  if (!providers.length) return null;
+  return {
+    providers,
+    tmdbLink: `https://www.themoviedb.org/movie/${tmdbId}/watch?locale=${country}`,
+  };
+}
 
 async function fetchWatchProviders(
   tmdbId: string,
@@ -64,11 +125,27 @@ async function fetchWatchProviders(
     );
     if (!res.ok) return null;
     const j = (await res.json()) as TmdbWatchProvidersResponse;
-    // Prefer flatrate (subscription) for the user's country; fall back to US.
     const region = j.results[country] ?? j.results.US;
-    const providers = region?.flatrate ?? [];
-    if (!providers.length || !region) return null;
-    return { providers, tmdbLink: region.link };
+    if (!region) return null;
+    const list = pickProviderList(region);
+    if (!list.length) return null;
+    const providers: ResolvedProvider[] = list.map((p) => ({
+      logoUrl: logoUrlFromPath(p.logo_path) ?? '',
+      providerName: p.provider_name,
+    }));
+    return { providers: providers.filter((p) => p.logoUrl), tmdbLink: region.link };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTmdbMovie(tmdbId: string, apiKey: string): Promise<TmdbMovie | null> {
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/movie/${encodeURIComponent(tmdbId)}?api_key=${apiKey}&language=en-US`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as TmdbMovie;
   } catch {
     return null;
   }
@@ -85,9 +162,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   // splitting cache via Vary or per-region paths if it becomes an issue.
   const country = (request as unknown as { cf?: { country?: string } }).cf?.country ?? 'US';
 
-  // Sharer attribution + watch-providers lookup run in parallel with item lookup.
   const sharerPromise = lookupSharer(env, fromUserId);
-  const watchProvidersPromise = fetchWatchProviders(tmdbId, env.TMDB_API_KEY, country);
 
   // 1. Try our DB first (cached movies)
   const item = await sbFetchOne<DbMovie>(env, {
@@ -95,50 +170,58 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     key: 'service',
   });
 
-  if (item) {
-    const [sharer, watchProviders] = await Promise.all([sharerPromise, watchProvidersPromise]);
-    return renderMovie({
-      title: item.title,
-      description: item.description ?? '',
-      posterPath: item.image_url,
-      releaseDate: item.metadata?.releaseDate ?? '',
-      runtime: item.metadata?.runtime ?? null,
-      director: item.metadata?.director ?? '',
-      genres: item.metadata?.genres ?? [],
-      tmdbId: item.external_id,
-      ogUrl,
-      sharer,
-      watchProviders,
-    });
-  }
+  // Detect a sparse DB row — substrate ingest paths sometimes write
+  // {title, poster, release_date} only, leaving description null + genres
+  // empty. Render-time fallback fetches TMDB to fill the gaps so the
+  // share-landing page is never bare. (Backlog item — fix at ingest.)
+  const dbIsSparse = !!item && (!item.description || (item.metadata?.genres?.length ?? 0) === 0);
+  const needsTmdb = !item || dbIsSparse;
 
-  // 2. Fall back to TMDB
-  if (!env.TMDB_API_KEY) return notFoundPage('Movie not found');
+  const tmdbPromise = needsTmdb && env.TMDB_API_KEY
+    ? fetchTmdbMovie(tmdbId, env.TMDB_API_KEY)
+    : Promise.resolve(null);
 
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/movie/${encodeURIComponent(tmdbId)}?api_key=${env.TMDB_API_KEY}&language=en-US`,
-    );
-    if (!res.ok) return notFoundPage('Movie not found');
-    const m = (await res.json()) as TmdbMovie;
-    const [sharer, watchProviders] = await Promise.all([sharerPromise, watchProvidersPromise]);
+  // Watch providers: prefer the cached metadata.watch_providers (already
+  // captures rent/buy shapes the live flatrate-only filter would discard),
+  // fall back to a fresh TMDB fetch if the cache is missing.
+  const cachedWatch = watchProvidersFromCache(item?.metadata?.watch_providers, country, tmdbId);
+  const watchProvidersPromise: Promise<WatchProvidersOut> = cachedWatch
+    ? Promise.resolve(cachedWatch)
+    : fetchWatchProviders(tmdbId, env.TMDB_API_KEY, country);
 
-    return renderMovie({
-      title: m.title,
-      description: m.overview ?? '',
-      posterPath: m.poster_path,
-      releaseDate: m.release_date ?? '',
-      runtime: m.runtime ?? null,
-      director: '',
-      genres: (m.genres ?? []).map((g) => g.name),
-      tmdbId,
-      ogUrl,
-      sharer,
-      watchProviders,
-    });
-  } catch {
-    return notFoundPage('Movie not found');
-  }
+  const [sharer, tmdb, watchProviders] = await Promise.all([
+    sharerPromise,
+    tmdbPromise,
+    watchProvidersPromise,
+  ]);
+
+  if (!item && !tmdb) return notFoundPage('Movie not found');
+
+  // Merge: prefer DB values when present, fill gaps from TMDB.
+  const title = item?.title ?? tmdb?.title ?? '';
+  const description = item?.description ?? tmdb?.overview ?? '';
+  const posterPath = item?.image_url ?? tmdb?.poster_path ?? null;
+  const releaseDate = item?.metadata?.releaseDate ?? tmdb?.release_date ?? '';
+  const runtime = item?.metadata?.runtime ?? tmdb?.runtime ?? null;
+  const director = item?.metadata?.director ?? '';
+  const dbGenres = item?.metadata?.genres ?? [];
+  const genres = dbGenres.length > 0
+    ? dbGenres
+    : (tmdb?.genres ?? []).map((g) => g.name);
+
+  return renderMovie({
+    title,
+    description,
+    posterPath,
+    releaseDate,
+    runtime,
+    director,
+    genres,
+    tmdbId: item?.external_id ?? tmdbId,
+    ogUrl,
+    sharer,
+    watchProviders,
+  });
 };
 
 type RenderArgs = {
@@ -194,8 +277,8 @@ function renderMovie(a: RenderArgs): Response {
              .slice(0, 8)
              .map(
                (p) => `<a class="provider-chip provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
-                 <img class="provider-icon" src="${TMDB_IMAGE_BASE}/w92${escapeHtml(p.logo_path)}" alt="${escapeHtml(p.provider_name)}" loading="lazy" />
-                 <span class="provider-name">${escapeHtml(p.provider_name)}</span>
+                 <img class="provider-icon" src="${escapeHtml(p.logoUrl)}" alt="${escapeHtml(p.providerName)}" loading="lazy" />
+                 <span class="provider-name">${escapeHtml(p.providerName)}</span>
                </a>`,
              )
              .join('')}
