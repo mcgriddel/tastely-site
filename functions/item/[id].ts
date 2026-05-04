@@ -1,5 +1,5 @@
 import { escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
-import { sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
+import { sbFetch, sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 import { lookupSharer } from '../_lib/sharer';
 
 type Env = SupabaseEnv;
@@ -172,43 +172,74 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     const info = gb.volumeInfo;
     const isbn = pickIsbn(info.industryIdentifiers);
 
-    // S140 — second-chance DB lookup by ISBN. The multi-shape lookup at the
-    // top of this function only knows the volume_id; we now have the ISBN
-    // GB gave us. If our DB has a row under `isbn-{isbn}` (NYT-ingested
-    // book), prefer DB metadata (NYT covers, image_sources chain, etc.)
-    // over what GB returns. Closes the gap that drove Theo of Golden to
-    // render with OL's broken ISBN cover even though we had the right NYT
-    // cover sitting in metadata of the matching row.
-    if (isbn) {
-      const isbnRow = await sbFetchOne<DbBook>(env, {
-        path: `items?external_id=eq.${encodeURIComponent('isbn-' + isbn)}&item_type=eq.book&select=title,description,image_url,external_id,external_source,metadata&limit=1`,
+    // S140 — second-chance DB lookup. The multi-shape lookup at the top of
+    // this function only knows the volume_id; we now have the ISBN(s) +
+    // title + author from GB. Try BOTH paths to find a matching DB row:
+    //   1. By any ISBN GB returned (ISBN_13 or ISBN_10) — covers the case
+    //      where GB and our DB happen to use the same edition's ISBN.
+    //   2. By (title + first author) — covers Theo-of-Golden-class cases
+    //      where GB and our DB carry different ISBNs for different editions
+    //      of the same book.
+    // If found, prefer DB metadata (NYT covers, image_sources chain) over
+    // what GB returns — both OL and GB are unreliable for some bestsellers.
+    let dbRow: DbBook | null = null;
+
+    // Path 1: try every ISBN GB returned
+    const allIsbns = (info.industryIdentifiers ?? [])
+      .map((i) => i.identifier)
+      .filter(Boolean);
+    for (const candidate of allIsbns) {
+      dbRow = await sbFetchOne<DbBook>(env, {
+        path: `items?external_id=eq.${encodeURIComponent('isbn-' + candidate)}&item_type=eq.book&select=title,description,image_url,external_id,external_source,metadata&limit=1`,
         key: 'service',
       });
-      if (isbnRow) {
-        const authors = isbnRow.metadata?.authors ?? info.authors ?? [];
-        const fromChain = pickFromImageSources(isbnRow.metadata?.image_sources);
-        const nytCover = isbnRow.metadata?.nyt_lists?.[0]?.book_image ?? '';
-        const isOlCanonical = (isbnRow.image_url ?? '').includes('covers.openlibrary.org');
-        const cover = (isOlCanonical && nytCover)
-          ? nytCover
-          : (isbnRow.image_url || nytCover || fromChain || pickBestCover(info.imageLinks) || openLibraryCover(isbn));
-        const sharer = await sharerPromise;
-        return renderBook({
-          title: isbnRow.title,
-          authors,
-          description: isbnRow.description || info.description || '',
-          cover,
-          fallbackCover: nytCover || pickBestCover(info.imageLinks) || openLibraryCover(isbn),
-          publishedDate: isbnRow.metadata?.publishedDate ?? info.publishedDate ?? '',
-          categories: isbnRow.metadata?.categories ?? info.categories ?? [],
-          pageCount: isbnRow.metadata?.pageCount ?? info.pageCount ?? null,
-          publisher: isbnRow.metadata?.publisher ?? info.publisher ?? '',
-          externalId: isbnRow.external_id,
-          externalSource: isbnRow.external_source ?? 'unknown',
-          ogUrl,
-          sharer,
-        });
+      if (dbRow) break;
+    }
+
+    // Path 2: title + first author lookup. Postgrest `ilike` for case-
+    // insensitive match. Authors check via metadata->>authors substring
+    // (cheap, good enough for first-author match).
+    if (!dbRow && info.title && info.authors && info.authors.length > 0) {
+      const titleQuery = info.title.replace(/[%_]/g, '\\$&');
+      const firstAuthor = info.authors[0];
+      const candidates = await sbFetch<DbBook>(env, {
+        path: `items?title=ilike.${encodeURIComponent(titleQuery)}&item_type=eq.book&select=title,description,image_url,external_id,external_source,metadata&limit=5`,
+        key: 'service',
+      });
+      if (candidates) {
+        dbRow = candidates.find((row) => {
+          const dbAuthors = row.metadata?.authors ?? [];
+          return dbAuthors.some(
+            (a) => a.toLowerCase() === firstAuthor.toLowerCase(),
+          );
+        }) ?? null;
       }
+    }
+
+    if (dbRow) {
+      const authors = dbRow.metadata?.authors ?? info.authors ?? [];
+      const fromChain = pickFromImageSources(dbRow.metadata?.image_sources);
+      const nytCover = dbRow.metadata?.nyt_lists?.[0]?.book_image ?? '';
+      const isOlCanonical = (dbRow.image_url ?? '').includes('covers.openlibrary.org');
+      const cover = (isOlCanonical && nytCover)
+        ? nytCover
+        : (dbRow.image_url || nytCover || fromChain || pickBestCover(info.imageLinks) || openLibraryCover(isbn));
+      const sharer = await sharerPromise;
+      return renderBook({
+        title: dbRow.title,
+        authors,
+        description: dbRow.description || info.description || '',
+        cover,
+        fallbackCover: nytCover || pickBestCover(info.imageLinks) || openLibraryCover(isbn),
+        publishedDate: dbRow.metadata?.publishedDate ?? info.publishedDate ?? '',
+        categories: dbRow.metadata?.categories ?? info.categories ?? [],
+        pageCount: dbRow.metadata?.pageCount ?? info.pageCount ?? null,
+        publisher: dbRow.metadata?.publisher ?? info.publisher ?? '',
+        externalId: dbRow.external_id,
+        externalSource: dbRow.external_source ?? 'unknown',
+        ogUrl,
+        sharer,
+      });
     }
 
     // Pure GB render (no DB row found by either path)
