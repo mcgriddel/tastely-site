@@ -820,14 +820,18 @@ const BASE_STYLES = `<style>
     transition: all 0.18s ease;
     line-height: 1;
   }
-  /* Icon-shape logos (Amazon symbol, Apple icon, BAM icon) — square,
-     paired with brand-name text. */
+  /* Icon-shape logos (Amazon symbol, Apple icon, BAM icon, B&N) —
+     uniform square box, paired with brand-name text. Padding gives
+     edge-to-edge logos (like B&N's letters) breathing room without
+     making logos with built-in whitespace look smaller. */
   .provider-icon {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     border-radius: 5px;
     object-fit: contain;
     flex-shrink: 0;
+    padding: 2px;
+    box-sizing: border-box;
   }
   /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
      alongside (wordmark already shows the brand name). */
