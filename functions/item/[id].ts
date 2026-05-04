@@ -369,7 +369,10 @@ function renderBook(a: RenderArgs): Response {
     saveCtaLabel: `Save ${a.title} to your library`,
   };
 
-  const metaParts = [year, pagesStr, a.publisher].filter(Boolean);
+  // Publisher dropped per Mac's S140 polish call — imprint names like
+  // "Atria" (S&S imprint) are informationally correct but unfamiliar.
+  // Keep meta line minimal: year + pages.
+  const metaParts = [year, pagesStr].filter(Boolean);
   const metaLine = metaParts.length
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
     : '';
