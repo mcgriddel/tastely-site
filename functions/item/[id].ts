@@ -82,6 +82,29 @@ function pickIsbn(ids?: { type: string; identifier: string }[]): string {
   );
 }
 
+// NYT bestseller substrate stores book titles in ALL CAPS ("THEO OF GOLDEN")
+// while every other source uses proper Title Case ("Theo of Golden"). Smart
+// title-case helper that ONLY fires when the input is entirely uppercase —
+// preserves correctly-cased acronyms (iOS, USA, NASA in normal mixed-case
+// titles aren't touched). When the whole string is upper, we treat it as the
+// NYT artifact and properly case it with English minor-word rules.
+function properCaseTitle(s: string): string {
+  if (!s) return s;
+  // If string has any lowercase letter, leave it alone.
+  if (s !== s.toUpperCase()) return s;
+  // If string has no letters at all (numbers / punctuation), leave it.
+  if (!/[A-Z]/.test(s)) return s;
+  const minor = new Set([
+    'a','an','the','and','but','or','nor','for','yet','so',
+    'as','at','by','for','from','in','of','off','on','onto','to','up','via','with',
+    'is','it',
+  ]);
+  return s.toLowerCase().split(/\s+/).map((word, i, arr) => {
+    if (i > 0 && i < arr.length - 1 && minor.has(word)) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1);
+  }).join(' ');
+}
+
 // S140 — Theo-of-Golden bug fix. The same book can exist in our DB under
 // multiple identifier shapes: NYT ingest stores `isbn-{n}`, Google Books
 // ingest stores the GB volume_id, OL ingest stores `ol:edition:OLxxxM`.
@@ -145,7 +168,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     const sharer = await sharerPromise;
 
     return renderBook({
-      title: item.title,
+      title: properCaseTitle(item.title),
       authors,
       description: item.description ?? '',
       cover,
@@ -234,7 +257,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       const description = info.description || dbRow.description || '';
       const sharer = await sharerPromise;
       return renderBook({
-        title: dbRow.title,
+        // Prefer GB's title (proper case) over DB's (often NYT all-caps).
+        title: properCaseTitle(info.title || dbRow.title),
         authors,
         description,
         cover,
@@ -256,7 +280,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     const sharer = await sharerPromise;
 
     return renderBook({
-      title: info.title,
+      title: properCaseTitle(info.title),
       authors: info.authors ?? [],
       description: info.description ?? '',
       cover,
@@ -284,7 +308,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
         const ol = await res.json() as any;
         const sharer = await sharerPromise;
         return renderBook({
-          title: ol.title || 'Unknown title',
+          title: properCaseTitle(ol.title || 'Unknown title'),
           authors: [],
           description: ol.description?.value || ol.description || '',
           cover: openLibraryCover(volumeId),
