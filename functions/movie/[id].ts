@@ -193,8 +193,8 @@ function renderMovie(a: RenderArgs): Response {
            ${a.watchProviders.providers
              .slice(0, 8)
              .map(
-               (p) => `<a class="provider-chip provider-chip--watch provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
-                 <img class="provider-icon provider-icon--watch" src="${TMDB_IMAGE_BASE}/w92${escapeHtml(p.logo_path)}" alt="${escapeHtml(p.provider_name)}" loading="lazy" />
+               (p) => `<a class="provider-chip provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
+                 <img class="provider-icon" src="${TMDB_IMAGE_BASE}/w92${escapeHtml(p.logo_path)}" alt="${escapeHtml(p.provider_name)}" loading="lazy" />
                  <span class="provider-name">${escapeHtml(p.provider_name)}</span>
                </a>`,
              )

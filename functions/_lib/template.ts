@@ -819,33 +819,29 @@ const BASE_STYLES = `<style>
     flex-wrap: wrap;
     gap: 8px;
   }
+  /* Sized to match action-pill height (~36px) — chips are informational,
+     not primary actions. Save/Board/Send/Share remain the visual anchor. */
   .provider-chip {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 16px;
+    gap: 8px;
+    padding: 6px 14px 6px 6px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
-    font-weight: 600;
-    font-size: 13.5px;
+    font-weight: 500;
+    font-size: 12.5px;
     color: var(--text);
     transition: all 0.18s ease;
     line-height: 1;
   }
-  /* Icon-shape logos (Amazon symbol, Apple icon, BAM icon, B&N) —
-     uniform square box, paired with brand-name text. Padding gives
-     edge-to-edge logos (like B&N's letters) breathing room without
-     making logos with built-in whitespace look smaller. */
   .provider-icon {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 5px;
     object-fit: contain;
     flex-shrink: 0;
-    padding: 2px;
-    box-sizing: border-box;
   }
   /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
      alongside (wordmark already shows the brand name). */
@@ -872,20 +868,6 @@ const BASE_STYLES = `<style>
   }
   .provider-chip--link:active {
     transform: translateY(0);
-  }
-  /* Watch-provider variant — informational, not a CTA. Slimmer than the
-     book retailer chips (which are the primary action on book pages). */
-  .provider-chip--watch {
-    padding: 6px 14px 6px 6px;
-    gap: 8px;
-    font-size: 12.5px;
-    font-weight: 500;
-  }
-  .provider-icon--watch {
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border-radius: 5px;
   }
 
   /* ── Trust footer ── */
