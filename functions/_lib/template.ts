@@ -513,7 +513,7 @@ const BASE_STYLES = `<style>
     max-width: 560px;
     margin: 0 auto;
   }
-  .chrome-logo img { display: block; height: 70px; width: auto; opacity: 0.95; }
+  .chrome-logo img { display: block; height: 88px; width: auto; opacity: 0.95; }
   .chrome-signin {
     font-family: 'Inter', sans-serif;
     font-weight: 500;
