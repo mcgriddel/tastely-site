@@ -994,13 +994,13 @@ const BASE_STYLES = `<style>
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: rgba(139, 82, 238, 0.12);
-    border: 1px solid rgba(139, 82, 238, 0.22);
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
     margin: 6px auto 18px;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--brand-purple);
+    color: var(--text);
   }
   .modal-icon-ring--success {
     background: rgba(52, 211, 153, 0.12);
