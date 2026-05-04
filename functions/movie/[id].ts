@@ -1,5 +1,6 @@
-import { escapeHtml, htmlResponse, notFoundPage, renderPage } from '../_lib/template';
+import { escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
 import { sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
+import { lookupSharer } from '../_lib/sharer';
 
 type Env = SupabaseEnv & { TMDB_API_KEY?: string };
 
@@ -31,7 +32,12 @@ const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
 export const onRequestGet: PagesFunction<Env> = async ({ params, env, request }) => {
   const tmdbId = String(params.id);
-  const ogUrl = new URL(request.url).toString();
+  const url = new URL(request.url);
+  const ogUrl = url.toString();
+  const fromUserId = url.searchParams.get('from');
+
+  // Sharer attribution lookup runs in parallel with item lookup.
+  const sharerPromise = lookupSharer(env, fromUserId);
 
   // 1. Try our DB first (cached movies)
   const item = await sbFetchOne<DbMovie>(env, {
@@ -40,16 +46,18 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   });
 
   if (item) {
+    const sharer = await sharerPromise;
     return renderMovie({
       title: item.title,
       description: item.description ?? '',
       posterPath: item.image_url,
       releaseDate: item.metadata?.releaseDate ?? '',
       runtime: item.metadata?.runtime ?? null,
-      voteAverage: item.metadata?.voteAverage ?? null,
       director: item.metadata?.director ?? '',
       genres: item.metadata?.genres ?? [],
+      tmdbId: item.external_id,
       ogUrl,
+      sharer,
     });
   }
 
@@ -62,6 +70,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     );
     if (!res.ok) return notFoundPage('Movie not found');
     const m = (await res.json()) as TmdbMovie;
+    const sharer = await sharerPromise;
 
     return renderMovie({
       title: m.title,
@@ -69,10 +78,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       posterPath: m.poster_path,
       releaseDate: m.release_date ?? '',
       runtime: m.runtime ?? null,
-      voteAverage: m.vote_average ?? null,
       director: '',
       genres: (m.genres ?? []).map((g) => g.name),
+      tmdbId,
       ogUrl,
+      sharer,
     });
   } catch {
     return notFoundPage('Movie not found');
@@ -85,10 +95,11 @@ type RenderArgs = {
   posterPath: string | null;
   releaseDate: string;
   runtime: number | null;
-  voteAverage: number | null;
   director: string;
   genres: string[];
+  tmdbId: string;
   ogUrl: string;
+  sharer: Awaited<ReturnType<typeof lookupSharer>>;
 };
 
 function renderMovie(a: RenderArgs): Response {
@@ -99,36 +110,81 @@ function renderMovie(a: RenderArgs): Response {
     : '';
   const year = a.releaseDate ? a.releaseDate.slice(0, 4) : '';
   const runtimeStr = a.runtime ? `${Math.floor(a.runtime / 60)}h ${a.runtime % 60}m` : '';
-  const ratingStr = a.voteAverage ? `★ ${a.voteAverage.toFixed(1)}` : '';
 
   const ogTitle = year ? `${a.title} (${year})` : a.title;
   const ogDescription = a.description
-    ? a.description.slice(0, 150) + (a.description.length > 150 ? '...' : '')
+    ? a.description.slice(0, 150) + (a.description.length > 150 ? '…' : '')
     : 'Discover this movie on Tastely';
+
+  const modalContext: ModalContext = {
+    itemTitle: a.title,
+    itemType: 'movie',
+    externalId: a.tmdbId,
+    externalSource: 'tmdb',
+    saveCtaLabel: `Save ${a.title} to your watchlist`,
+  };
+
+  const metaParts = [year, runtimeStr, a.director].filter(Boolean);
+  const metaLine = metaParts.length
+    ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
+    : '';
+
+  const genresHtml = a.genres.length
+    ? `<div class="section">
+         <p class="section-label">Genres</p>
+         <div class="providers">
+           ${a.genres
+             .slice(0, 6)
+             .map((g) => `<span class="provider-chip">${escapeHtml(g)}</span>`)
+             .join('')}
+         </div>
+       </div>`
+    : '';
+
+  const body = `
+    <div class="detail-hero">
+      <p class="detail-eyebrow">Movie</p>
+      ${posterUrl ? `<img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(a.title)}" class="detail-cover" />` : '<div class="detail-cover"></div>'}
+      <h1 class="detail-title">${escapeHtml(a.title)}</h1>
+      ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
+    </div>
+
+    <div class="actions">
+      <button class="pill" type="button" data-share-action="save">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Save
+      </button>
+      <button class="pill" type="button" data-share-action="board">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="2"/><path d="M3 10H21" stroke="currentColor" stroke-width="2"/></svg>
+        Board
+      </button>
+      <button class="pill" type="button" data-share-action="send">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Send
+      </button>
+      <button class="pill" type="button" data-share-action="share">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Share
+      </button>
+    </div>
+
+    ${a.description ? `
+    <div class="section">
+      <p class="section-label">About</p>
+      <p class="section-prose">${escapeHtml(a.description)}</p>
+    </div>` : ''}
+
+    ${genresHtml}
+  `;
 
   const html = renderPage({
     ogTitle,
     ogDescription,
     ogImage: posterUrl,
     ogUrl: a.ogUrl,
-    body: `
-      <div class="detail">
-        <div class="detail-header">
-          ${posterUrl ? `<img src="${posterUrl}" alt="${escapeHtml(a.title)}" class="detail-poster" />` : '<div class="detail-poster"></div>'}
-          <div class="detail-info">
-            <h1>${escapeHtml(a.title)}</h1>
-            <p class="meta">${[year, runtimeStr, a.director].filter(Boolean).map(escapeHtml).join(' · ')}</p>
-            ${ratingStr ? `<p class="rating">${ratingStr}</p>` : ''}
-            ${a.genres.length > 0 ? `<div class="genres">${a.genres.map((g) => `<span class="genre">${escapeHtml(g)}</span>`).join('')}</div>` : ''}
-          </div>
-        </div>
-        ${a.description ? `<p class="overview">${escapeHtml(a.description)}</p>` : ''}
-      </div>
-      <div class="cta">
-        <p class="cta-text">Rate, review, and discover on Tastely</p>
-        <a href="https://trytastely.com" class="cta-button">Get Tastely</a>
-      </div>
-    `,
+    sharer: a.sharer,
+    modalContext,
+    body,
   });
 
   return htmlResponse(html, 86400);
