@@ -803,25 +803,37 @@ const BASE_STYLES = `<style>
   .provider-chip {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 14px 8px 8px;
+    gap: 10px;
+    padding: 7px 16px 7px 7px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 999px;
     font-family: 'Inter', sans-serif;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 13.5px;
     color: var(--text);
     transition: all 0.18s ease;
     line-height: 1;
   }
-  .provider-logo {
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    object-fit: cover;
-    background: white;
+  /* iOS-app-icon-style retailer mark — brand color + 1-2 letter monogram
+     + inset sheen for depth. Uniform across retailers, no logo CDN needed. */
+  .provider-mark {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex-shrink: 0;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: -0.5px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      inset 0 -1px 1px rgba(0, 0, 0, 0.18),
+      0 1px 2px rgba(0, 0, 0, 0.4);
   }
   .provider-chip--link {
     text-decoration: none;
@@ -831,15 +843,10 @@ const BASE_STYLES = `<style>
     background: var(--surface-alt);
     border-color: var(--border-hover);
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
-  .provider-arrow {
-    color: var(--text-4);
-    font-size: 11px;
-    margin-left: 2px;
-  }
-  .provider-chip--link:hover .provider-arrow {
-    color: var(--brand-purple);
+  .provider-chip--link:active {
+    transform: translateY(0);
   }
 
   /* ── Trust footer ── */

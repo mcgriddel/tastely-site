@@ -366,27 +366,33 @@ function renderBook(a: RenderArgs): Response {
     ? `<img src="${escapeHtml(a.cover)}" alt="${escapeHtml(a.title)}" class="detail-cover" ${a.fallbackCover ? `onerror="this.onerror=null;this.src='${escapeHtml(a.fallbackCover)}'"` : ''} />`
     : '<div class="detail-cover"></div>';
 
-  // Domain → DuckDuckGo favicon CDN. Handles any retailer (Amazon, B&N,
-  // Bookshop, Books-A-Million, and any future NYT additions like Indigo)
-  // without needing a per-brand lookup. Strips affiliate-redirect wrappers
-  // (e.g. anrdoezrs.net for Books-A-Million) by walking the URL chain.
-  function logoFor(linkUrl: string): string {
-    try {
-      const u = new URL(linkUrl);
-      // Many affiliate links are tracker-prefixed (anrdoezrs, sjv.io). Try
-      // to find the real destination domain in the URL path/query.
-      const host = u.hostname.replace(/^www\./, '');
-      // Look for a known affiliate-tracker; if found, scan the URL for
-      // the actual retailer hostname embedded in path/query.
-      const trackerHosts = ['anrdoezrs.net', 'sjv.io', 'goto.applebooks.apple', 'barnesandnoble.sjv.io'];
-      if (trackerHosts.some((t) => host.includes(t))) {
-        const m = linkUrl.match(/(?:https?[%:]\/\/|www\.)([a-z0-9-]+\.(?:com|org|net|co\.uk))/i);
-        if (m) return `https://icons.duckduckgo.com/ip3/${m[1].replace(/^www\./, '')}.ico`;
-      }
-      return `https://icons.duckduckgo.com/ip3/${host}.ico`;
-    } catch {
-      return '';
+  // iOS-app-icon-style retailer marks — brand color + 1-2 letter monogram.
+  // Uniform across retailers (no logo CDN dependency, no quality drift on
+  // unknown retailers). Each entry = { color, glyph }. New retailers fall
+  // back to a neutral mark + first letter so we never render a broken icon.
+  const RETAILER_MARK: Record<string, { color: string; glyph: string }> = {
+    'amazon':           { color: '#FF9900', glyph: 'a' },
+    'apple books':      { color: '#FA243C', glyph: 'A' },
+    'apple':            { color: '#FA243C', glyph: 'A' },
+    'barnes & noble':   { color: '#157A4E', glyph: '&' },
+    'books-a-million':  { color: '#0F4C81', glyph: 'M' },
+    'bookshop.org':     { color: '#3F4046', glyph: 'B' },
+    'bookshop':         { color: '#3F4046', glyph: 'B' },
+    'audible':          { color: '#F59B00', glyph: 'A' },
+    'kobo':             { color: '#E84F26', glyph: 'K' },
+    'indigo':           { color: '#1D3F8C', glyph: 'i' },
+    'target':           { color: '#CC0000', glyph: 'T' },
+    'walmart':          { color: '#0071CE', glyph: 'W' },
+  };
+
+  function markFor(name: string): { color: string; glyph: string } {
+    const key = name.toLowerCase().trim();
+    if (RETAILER_MARK[key]) return RETAILER_MARK[key];
+    // Fuzzy: any key that's contained in or contains the name
+    for (const k of Object.keys(RETAILER_MARK)) {
+      if (key.includes(k) || k.includes(key)) return RETAILER_MARK[k];
     }
+    return { color: '#3F4046', glyph: name.charAt(0).toUpperCase() || 'B' };
   }
 
   const buyLinksHtml = a.buyLinks.length
@@ -395,9 +401,11 @@ function renderBook(a: RenderArgs): Response {
          <div class="providers">
            ${a.buyLinks
              .map((b) => {
-               const logo = logoFor(b.url);
-               const logoTag = logo ? `<img src="${escapeAttr(logo)}" alt="" class="provider-logo" loading="lazy" />` : '';
-               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${logoTag}${escapeHtml(b.name)}<span class="provider-arrow" aria-hidden="true">↗</span></a>`;
+               const m = markFor(b.name);
+               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">
+                 <span class="provider-mark" style="background:${m.color}">${escapeHtml(m.glyph)}</span>
+                 ${escapeHtml(b.name)}
+               </a>`;
              })
              .join('')}
          </div>
