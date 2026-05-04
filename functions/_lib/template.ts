@@ -844,11 +844,12 @@ const BASE_STYLES = `<style>
     flex-shrink: 0;
   }
   /* Tight-cropped marks (B&N's local PNG) — drop the corner radius so
-     the letters render at full 22x22 without being clipped. Apple/BAM
-     keep the radius because their iOS-app-icon shape is part of the
-     artwork; B&N is just letters and needs the full square. */
+     the letters render without being clipped, then scale down slightly
+     so the mark sits with breathing room comparable to Apple/BAM's
+     iOS-icon glyphs (whose rounded shape lives inside the artwork). */
   .provider-icon--inset {
     border-radius: 0;
+    transform: scale(0.85);
   }
   /* Wordmark-shape logos (B&N, Bookshop, Kobo) — render alone, no text
      alongside (wordmark already shows the brand name). */
