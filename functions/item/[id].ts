@@ -393,11 +393,19 @@ function renderBook(a: RenderArgs): Response {
     return null;
   }
 
-  const buyLinksHtml = a.buyLinks.length
+  // Retailers to suppress from the where-to-buy strip. Lowercased name
+  // match. Add to this set to hide a retailer without removing the data
+  // from the upstream NYT substrate.
+  const BUY_LINK_BLOCKLIST = new Set(['bookshop.org', 'bookshop']);
+  const visibleBuyLinks = a.buyLinks.filter(
+    (b) => !BUY_LINK_BLOCKLIST.has(b.name.toLowerCase().trim()),
+  );
+
+  const buyLinksHtml = visibleBuyLinks.length
     ? `<div class="section">
          <p class="section-label">Where to buy</p>
          <div class="providers">
-           ${a.buyLinks
+           ${visibleBuyLinks
              .map((b) => {
                const logo = logoFor(b.name);
                if (!logo) {
