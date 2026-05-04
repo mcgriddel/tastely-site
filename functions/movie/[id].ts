@@ -28,16 +28,66 @@ type TmdbMovie = {
   genres: { name: string }[];
 };
 
+type TmdbWatchProvider = {
+  logo_path: string;
+  provider_name: string;
+  provider_id: number;
+};
+
+type WatchProvidersForRegion = {
+  link: string;
+  flatrate?: TmdbWatchProvider[];
+  rent?: TmdbWatchProvider[];
+  buy?: TmdbWatchProvider[];
+};
+
+type TmdbWatchProvidersResponse = {
+  results: Record<string, WatchProvidersForRegion | undefined>;
+};
+
+type WatchProvidersOut = {
+  providers: TmdbWatchProvider[];
+  tmdbLink: string;
+} | null;
+
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
+
+async function fetchWatchProviders(
+  tmdbId: string,
+  apiKey: string | undefined,
+  country: string,
+): Promise<WatchProvidersOut> {
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/movie/${encodeURIComponent(tmdbId)}/watch/providers?api_key=${apiKey}`,
+    );
+    if (!res.ok) return null;
+    const j = (await res.json()) as TmdbWatchProvidersResponse;
+    // Prefer flatrate (subscription) for the user's country; fall back to US.
+    const region = j.results[country] ?? j.results.US;
+    const providers = region?.flatrate ?? [];
+    if (!providers.length || !region) return null;
+    return { providers, tmdbLink: region.link };
+  } catch {
+    return null;
+  }
+}
 
 export const onRequestGet: PagesFunction<Env> = async ({ params, env, request }) => {
   const tmdbId = String(params.id);
   const url = new URL(request.url);
   const ogUrl = url.toString();
   const fromUserId = url.searchParams.get('from');
+  // CF edges set `request.cf.country` to the viewer's 2-letter ISO code.
+  // Cached HTML responses are keyed by URL only — first viewer at an edge
+  // determines that edge's cached country. Acceptable v1; revisit by
+  // splitting cache via Vary or per-region paths if it becomes an issue.
+  const country = (request as unknown as { cf?: { country?: string } }).cf?.country ?? 'US';
 
-  // Sharer attribution lookup runs in parallel with item lookup.
+  // Sharer attribution + watch-providers lookup run in parallel with item lookup.
   const sharerPromise = lookupSharer(env, fromUserId);
+  const watchProvidersPromise = fetchWatchProviders(tmdbId, env.TMDB_API_KEY, country);
 
   // 1. Try our DB first (cached movies)
   const item = await sbFetchOne<DbMovie>(env, {
@@ -46,7 +96,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   });
 
   if (item) {
-    const sharer = await sharerPromise;
+    const [sharer, watchProviders] = await Promise.all([sharerPromise, watchProvidersPromise]);
     return renderMovie({
       title: item.title,
       description: item.description ?? '',
@@ -58,6 +108,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       tmdbId: item.external_id,
       ogUrl,
       sharer,
+      watchProviders,
     });
   }
 
@@ -70,7 +121,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     );
     if (!res.ok) return notFoundPage('Movie not found');
     const m = (await res.json()) as TmdbMovie;
-    const sharer = await sharerPromise;
+    const [sharer, watchProviders] = await Promise.all([sharerPromise, watchProvidersPromise]);
 
     return renderMovie({
       title: m.title,
@@ -83,6 +134,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       tmdbId,
       ogUrl,
       sharer,
+      watchProviders,
     });
   } catch {
     return notFoundPage('Movie not found');
@@ -100,6 +152,7 @@ type RenderArgs = {
   tmdbId: string;
   ogUrl: string;
   sharer: Awaited<ReturnType<typeof lookupSharer>>;
+  watchProviders: WatchProvidersOut;
 };
 
 function renderMovie(a: RenderArgs): Response {
@@ -127,6 +180,25 @@ function renderMovie(a: RenderArgs): Response {
   const metaParts = [year, runtimeStr, a.director, ...a.genres.slice(0, 2)].filter(Boolean);
   const metaLine = metaParts.length
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
+    : '';
+
+  // TMDB requires JustWatch attribution alongside watch-provider data.
+  const watchHtml = a.watchProviders && a.watchProviders.providers.length
+    ? `<div class="section">
+         <p class="section-label">Where to watch</p>
+         <div class="providers">
+           ${a.watchProviders.providers
+             .slice(0, 8)
+             .map(
+               (p) => `<a class="provider-chip provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
+                 <img class="provider-icon" src="${TMDB_IMAGE_BASE}/w92${escapeHtml(p.logo_path)}" alt="${escapeHtml(p.provider_name)}" loading="lazy" />
+                 <span class="provider-name">${escapeHtml(p.provider_name)}</span>
+               </a>`,
+             )
+             .join('')}
+         </div>
+         <p class="watch-attribution">via JustWatch</p>
+       </div>`
     : '';
 
   const body = `
@@ -160,6 +232,8 @@ function renderMovie(a: RenderArgs): Response {
       <p class="section-label">About</p>
       <p class="section-prose">${escapeHtml(a.description)}</p>
     </div>` : ''}
+
+    ${watchHtml}
   `;
 
   const html = renderPage({

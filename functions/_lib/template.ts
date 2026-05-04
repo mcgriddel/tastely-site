@@ -873,6 +873,14 @@ const BASE_STYLES = `<style>
   .provider-chip--link:active {
     transform: translateY(0);
   }
+  /* JustWatch attribution — TMDB ToS requires this near watch-provider chips. */
+  .watch-attribution {
+    font-family: 'Outfit', sans-serif;
+    font-size: 11px;
+    color: var(--text-4);
+    margin-top: 10px;
+    letter-spacing: 0.02em;
+  }
 
   /* ── Trust footer ── */
   .trust-footer {
