@@ -48,7 +48,7 @@
             z-index: 1;
         }
         .nav-logo img {
-            height: 32px;
+            height: 56px;
             width: auto;
             opacity: 0.9;
         }
@@ -81,7 +81,7 @@
         }
 
         .hero-wordmark {
-            height: 80px;
+            height: 100px;
             width: auto;
             margin-bottom: 32px;
             opacity: 0.95;
@@ -188,12 +188,11 @@
             border-top: 1px solid #1F1F1F;
             padding: 24px 32px;
             display: flex;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
             position: relative;
             z-index: 1;
         }
-        footer .footer-logo img { height: 20px; opacity: 0.5; }
         .footer-right {
             display: flex;
             align-items: center;
@@ -214,6 +213,7 @@
         /* Mobile */
         @media (max-width: 640px) {
             nav { padding: 16px 20px; }
+            .nav-logo img { height: 40px; }
             .hero { padding: 0 0 32px; }
             .hero-wordmark { height: 64px; margin-bottom: 24px; }
             .waitlist-form { flex-direction: column; }
@@ -275,7 +275,6 @@
     </div>
 
     <footer>
-        <div class="footer-logo"><img src="wordmark.png" alt="Tastely"></div>
         <div class="footer-right">
             <a href="/privacy.html" class="footer-link">Privacy</a>
             <a href="/terms.html" class="footer-link">Terms</a>
