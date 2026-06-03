@@ -65,8 +65,8 @@ export function renderPage(opts: PageOptions): string {
     ogTitle,
     ogDescription,
     ogImage,
-    ogImageWidth = 500,
-    ogImageHeight = 750,
+    ogImageWidth,
+    ogImageHeight,
     ogUrl,
     body,
     sharer,
@@ -96,8 +96,8 @@ export function renderPage(opts: PageOptions): string {
   <meta property="og:title" content="${escapeAttr(ogTitle)}" />
   <meta property="og:description" content="${escapeAttr(ogDescription)}" />
   ${ogImage ? `<meta property="og:image" content="${escapeAttr(ogImage)}" />` : ''}
-  <meta property="og:image:width" content="${ogImageWidth}" />
-  <meta property="og:image:height" content="${ogImageHeight}" />
+  ${ogImage && ogImageWidth && ogImageHeight ? `<meta property="og:image:width" content="${ogImageWidth}" />
+  <meta property="og:image:height" content="${ogImageHeight}" />` : ''}
   <meta property="og:url" content="${escapeAttr(ogUrl)}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Tastely" />
