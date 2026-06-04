@@ -73,6 +73,24 @@ function pickFromImageSources(
   return sorted[0]?.url ?? '';
 }
 
+// iMessage / Open Graph unfurlers do NOT follow HTTP redirects when fetching
+// og:image — they take the URL as-is. Open Library cover URLs (our priority-1
+// book-cover source) now 302-redirect to archive.org, and Wikidata FilePath
+// covers 302 to Commons; a non-following fetcher gets a redirect stub instead
+// of an image, so the preview card renders no picture. Resolve the og:image to
+// its final, directly-fetchable URL so the card always shows the cover. The
+// in-page <img> is left on the original URL — browsers follow redirects fine.
+async function resolveOgImageUrl(url: string): Promise<string> {
+  if (!url) return url;
+  try {
+    const res = await fetch(url, { redirect: 'follow', headers: { Range: 'bytes=0-0' } });
+    if (res.ok && res.url) return res.url;
+  } catch {
+    /* network failure — emit the original URL unchanged */
+  }
+  return url;
+}
+
 function pickIsbn(ids?: { type: string; identifier: string }[]): string {
   if (!ids) return '';
   return (
@@ -168,7 +186,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       : (item.image_url || nytCover || fromChain || openLibraryCover(isbn));
     const sharer = await sharerPromise;
 
-    return renderBook({
+    return await renderBook({
       title: properCaseTitle(item.title),
       authors,
       description: item.description ?? '',
@@ -257,7 +275,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       // bestseller blurb. Fall back to DB only if GB has nothing.
       const description = info.description || dbRow.description || '';
       const sharer = await sharerPromise;
-      return renderBook({
+      return await renderBook({
         // Prefer GB's title (proper case) over DB's (often NYT all-caps).
         title: properCaseTitle(info.title || dbRow.title),
         authors,
@@ -280,7 +298,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     const cover = pickBestCover(info.imageLinks) || openLibraryCover(isbn);
     const sharer = await sharerPromise;
 
-    return renderBook({
+    return await renderBook({
       title: properCaseTitle(info.title),
       authors: info.authors ?? [],
       description: info.description ?? '',
@@ -308,7 +326,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       if (res.ok) {
         const ol = await res.json() as any;
         const sharer = await sharerPromise;
-        return renderBook({
+        return await renderBook({
           title: properCaseTitle(ol.title || 'Unknown title'),
           authors: [],
           description: ol.description?.value || ol.description || '',
@@ -367,7 +385,7 @@ function stripHtmlPreservingBreaks(html: string): string {
     .trim();
 }
 
-function renderBook(a: RenderArgs): Response {
+async function renderBook(a: RenderArgs): Promise<Response> {
   const year = a.publishedDate ? a.publishedDate.slice(0, 4) : '';
   const authorStr = a.authors[0] ?? '';
   const allAuthors = a.authors.length ? a.authors.join(', ') : '';
@@ -513,10 +531,12 @@ function renderBook(a: RenderArgs): Response {
     ${categoriesHtml}
   `;
 
+  const ogImage = await resolveOgImageUrl(a.cover || a.fallbackCover);
+
   const html = renderPage({
     ogTitle,
     ogDescription,
-    ogImage: a.cover || a.fallbackCover,
+    ogImage,
     ogUrl: a.ogUrl,
     sharer: a.sharer,
     modalContext,
