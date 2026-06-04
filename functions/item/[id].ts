@@ -96,11 +96,12 @@ function properCaseTitle(s: string): string {
   if (!/[A-Z]/.test(s)) return s;
   const minor = new Set([
     'a','an','the','and','but','or','nor','for','yet','so',
-    'as','at','by','for','from','in','of','off','on','onto','to','up','via','with',
-    'is','it',
+    'as','at','by','from','in','of','off','on','onto','to','up','via','with',
   ]);
   return s.toLowerCase().split(/\s+/).map((word, i, arr) => {
-    if (i > 0 && i < arr.length - 1 && minor.has(word)) return word;
+    // First/last word always cap; first word after a colon/sentence break caps.
+    const afterBreak = i > 0 && /[:.?!—–]$/.test(arr[i - 1]);
+    if (i > 0 && i < arr.length - 1 && !afterBreak && minor.has(word)) return word;
     return word.charAt(0).toUpperCase() + word.slice(1);
   }).join(' ');
 }
