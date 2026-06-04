@@ -131,6 +131,18 @@ function properCaseTitle(s: string): string {
 // app saw — which won't always match what's in our DB. Try every shape we
 // know about before giving up.
 async function multiLookupBook(env: Env, id: string): Promise<DbBook | null> {
+  // Internal item UUID (items.id primary key). The app shares links by this
+  // stable internal id — the most reliable identifier, since external_ids
+  // vary by source/edition (the Theo-of-Golden problem). Try it first.
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  if (isUuid) {
+    const byUuid = await sbFetchOne<DbBook>(env, {
+      path: `items?id=eq.${encodeURIComponent(id)}&item_type=eq.book&select=title,description,image_url,external_id,external_source,metadata&limit=1`,
+      key: 'service',
+    });
+    if (byUuid) return byUuid;
+  }
+
   // Direct external_id hit (covers NYT-ingested isbn-* rows + native GB IDs)
   const direct = await sbFetchOne<DbBook>(env, {
     path: `items?external_id=eq.${encodeURIComponent(id)}&item_type=eq.book&select=title,description,image_url,external_id,external_source,metadata&limit=1`,
