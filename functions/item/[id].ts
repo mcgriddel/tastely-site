@@ -208,7 +208,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       categories: item.metadata?.categories ?? [],
       pageCount: item.metadata?.pageCount ?? null,
       publisher: item.metadata?.publisher ?? '',
-      buyLinks: item.metadata?.buy_links ?? [],
+      isbn: isbn ?? null,
       externalId: item.external_id,
       externalSource: item.external_source ?? 'unknown',
       ogUrl,
@@ -298,7 +298,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
         categories: dbRow.metadata?.categories ?? info.categories ?? [],
         pageCount: dbRow.metadata?.pageCount ?? info.pageCount ?? null,
         publisher: dbRow.metadata?.publisher ?? info.publisher ?? '',
-        buyLinks: dbRow.metadata?.buy_links ?? [],
+        isbn: dbRow.metadata?.isbn ?? dbRow.metadata?.isbn_13 ?? isbn ?? null,
         externalId: dbRow.external_id,
         externalSource: dbRow.external_source ?? 'unknown',
         ogUrl,
@@ -320,7 +320,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       categories: info.categories ?? [],
       pageCount: info.pageCount ?? null,
       publisher: info.publisher ?? '',
-      buyLinks: [],
+      isbn: isbn ?? null,
       externalId: volumeId,
       externalSource: 'googlebooks',
       ogUrl,
@@ -348,7 +348,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
           categories: [],
           pageCount: ol.number_of_pages ?? null,
           publisher: (ol.publishers && ol.publishers[0]) || '',
-          buyLinks: [],
+          isbn: volumeId,
           externalId: 'isbn-' + volumeId,
           externalSource: 'openlibrary',
           ogUrl,
@@ -373,7 +373,7 @@ type RenderArgs = {
   categories: string[];
   pageCount: number | null;
   publisher: string;
-  buyLinks: Array<{ name: string; url: string }>;
+  isbn: string | null;
   externalId: string;
   externalSource: string;
   ogUrl: string;
@@ -438,68 +438,58 @@ async function renderBook(a: RenderArgs): Promise<Response> {
     ? `<img src="${escapeHtml(a.cover)}" alt="${escapeHtml(a.title)}" class="detail-cover" ${a.fallbackCover ? `onerror="this.onerror=null;this.src='${escapeHtml(a.fallbackCover)}'"` : ''} />`
     : '<div class="detail-cover"></div>';
 
-  // S140 — retailer logos sourced from Brandfetch CDN (real brand assets).
-  // URLs pre-fetched once via Brand API + hardcoded so the function does
-  // zero runtime API calls (stays under free-tier limits permanently and
-  // resilient to Brandfetch availability). The embedded `c=` token in
-  // each URL is Brandfetch's per-brand CDN auth, designed for hotlinking.
+  // Where to read — canonical retailer set, built from the book's ISBN-13 +
+  // title to MIRROR the in-app shared util (app/src/modules/books/utils/
+  // bookRetailers.ts) so the share page and the app never drift. Keep the two
+  // in sync: same retailer set, same order, same URL logic, same logos.
   //
-  // shape: 'icon' = square symbol/icon (combines well with brand-name text)
-  //        'wordmark' = full brand wordmark (renders alone, no text — the
-  //         wordmark IS the brand identity, text would be redundant)
-  // Refresh by re-running the Brand API lookup if a logo ever 404s.
-  // Map keys = lowercase NYT retailer names.
-  // `inset: true` adds internal padding for full-bleed marks that would
-  // otherwise clip into the rounded-square edges (e.g. B&N's local PNG).
-  type RetailerLogo = { url: string; shape: 'icon' | 'wordmark'; inset?: boolean };
-  const RETAILER_LOGO: Record<string, RetailerLogo> = {
-    'amazon':           { url: 'https://cdn.brandfetch.io/idawOgYOsG/theme/dark/symbol.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'apple books':      { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'apple':            { url: 'https://cdn.brandfetch.io/idnrCPuv87/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'barnes & noble':   { url: '/retailers/barnesandnoble.png', shape: 'icon', inset: true },
-    'books-a-million':  { url: 'https://cdn.brandfetch.io/idpqzOZXsi/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'bookshop.org':     { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
-    'bookshop':         { url: 'https://cdn.brandfetch.io/ideqM0dIIo/w/396/h/104/theme/dark/logo.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
-    'audible':          { url: 'https://cdn.brandfetch.io/idT82q9yNb/w/400/h/400/theme/dark/icon.png?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'icon' },
-    'kobo':             { url: 'https://cdn.brandfetch.io/id3tDnj0HA/theme/dark/logo.svg?c=1bxzxbvnwju0xdrqkbt3cqp2ha89ksp2yLT', shape: 'wordmark' },
+  // We build our OWN clean links from the ISBN — NOT NYT's `buy_links` (those
+  // are affiliate-redirect wrappers carrying NYT's attribution tags). ISBN-
+  // direct where the retailer exposes one (B&N ?ean=, Bookshop /book/, Apple
+  // goto-gateway); ISBN/title search otherwise. Apple Books only when we have an
+  // ISBN (no clean search fallback). Logos are the same 64×64 brand tiles the
+  // app bundles, served locally from /retailers/*.png.
+  //
+  // Affiliate attribution choke-point: applyAffiliate() is identity today
+  // (clean links, no tags). When Tastely joins retailer programs, inject tags
+  // HERE only — and mirror the change in the app util.
+  const applyAffiliate = (_key: string, url: string): string => url;
+
+  const normalizeIsbn = (raw: string | null): string | null => {
+    if (!raw) return null;
+    const s = raw.replace(/[^0-9Xx]/g, '').toUpperCase();
+    return s.length === 10 || s.length === 13 ? s : null;
   };
 
-  function logoFor(name: string): RetailerLogo | null {
-    const key = name.toLowerCase().trim();
-    if (RETAILER_LOGO[key]) return RETAILER_LOGO[key];
-    for (const k of Object.keys(RETAILER_LOGO)) {
-      if (key.includes(k) || k.includes(key)) return RETAILER_LOGO[k];
-    }
-    return null;
-  }
+  type RetailerSpec = { key: string; label: string; build: (isbn: string | null, q: string) => string | null };
+  const RETAILERS: RetailerSpec[] = [
+    { key: 'amazon', label: 'Amazon', build: (isbn, q) => `https://www.amazon.com/s?k=${isbn ?? q}&i=stripbooks` },
+    { key: 'kindle', label: 'Kindle', build: (_isbn, q) => `https://www.amazon.com/s?k=${q}&i=digital-text` },
+    { key: 'applebooks', label: 'Apple Books', build: (isbn) => (isbn ? `https://goto.applebooks.apple/${isbn}` : null) },
+    { key: 'barnesandnoble', label: 'Barnes & Noble', build: (isbn, q) => (isbn ? `https://www.barnesandnoble.com/w/?ean=${isbn}` : `https://www.barnesandnoble.com/s/${q}`) },
+    { key: 'bookshop', label: 'Bookshop.org', build: (isbn, q) => (isbn ? `https://bookshop.org/book/${isbn}` : `https://bookshop.org/search?keywords=${q}`) },
+    { key: 'booksamillion', label: 'Books-A-Million', build: (isbn, q) => `https://www.booksamillion.com/search?query=${isbn ?? q}` },
+    { key: 'audible', label: 'Audible', build: (_isbn, q) => `https://www.audible.com/search?keywords=${q}` },
+  ];
 
-  // Retailers to suppress from the where-to-buy strip. Lowercased name
-  // match. Add to this set to hide a retailer without removing the data
-  // from the upstream NYT substrate.
-  const BUY_LINK_BLOCKLIST = new Set(['bookshop.org', 'bookshop']);
-  const visibleBuyLinks = a.buyLinks.filter(
-    (b) => !BUY_LINK_BLOCKLIST.has(b.name.toLowerCase().trim()),
-  );
+  const retailerIsbn = normalizeIsbn(a.isbn);
+  const retailerQ = encodeURIComponent(a.title + (a.authors[0] ? ' ' + a.authors[0] : ''));
+  const retailerLinks = RETAILERS
+    .map((s) => {
+      const url = s.build(retailerIsbn, retailerQ);
+      return url ? { key: s.key, label: s.label, url: applyAffiliate(s.key, url) } : null;
+    })
+    .filter((x): x is { key: string; label: string; url: string } => x !== null);
 
-  const buyLinksHtml = visibleBuyLinks.length
+  const buyLinksHtml = retailerLinks.length
     ? `<div class="section">
-         <p class="section-label">Where to buy</p>
+         <p class="section-label">Where to read</p>
          <div class="providers">
-           ${visibleBuyLinks
-             .map((b) => {
-               const logo = logoFor(b.name);
-               if (!logo) {
-                 // unknown retailer → text-only chip (safe fallback)
-                 return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener">${escapeHtml(b.name)}</a>`;
-               }
-               if (logo.shape === 'wordmark') {
-                 // wordmark IS the brand — render alone, no text alongside
-                 return `<a class="provider-chip provider-chip--link provider-chip--wordmark" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener" aria-label="Buy on ${escapeAttr(b.name)}"><img src="${escapeAttr(logo.url)}" alt="${escapeAttr(b.name)}" class="provider-wordmark" loading="lazy" /></a>`;
-               }
-               // icon shape — combines with brand-name text
-               const iconClass = logo.inset ? 'provider-icon provider-icon--inset' : 'provider-icon';
-               return `<a class="provider-chip provider-chip--link" href="${escapeAttr(b.url)}" target="_blank" rel="nofollow noopener"><img src="${escapeAttr(logo.url)}" alt="" class="${iconClass}" loading="lazy" />${escapeHtml(b.name)}</a>`;
-             })
+           ${retailerLinks
+             .map(
+               (r) =>
+                 `<a class="provider-chip provider-chip--link" href="${escapeAttr(r.url)}" target="_blank" rel="nofollow noopener"><img src="/retailers/${r.key}.png" alt="" class="provider-icon" loading="lazy" />${escapeHtml(r.label)}</a>`,
+             )
              .join('')}
          </div>
        </div>`
