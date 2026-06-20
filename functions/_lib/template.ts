@@ -1253,7 +1253,7 @@ function heroGlowStyle(rgb: string): string {
 export function notFoundPage(message: string, status = 404): Response {
   const html = renderPage({
     ogTitle: 'Tastely',
-    ogDescription: 'Discover better recommendations',
+    ogDescription: 'Follow your interests',
     ogImage: '',
     ogUrl: 'https://trytastely.com',
     body: `
