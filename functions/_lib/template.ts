@@ -58,6 +58,16 @@ export type PageOptions = {
   // to brand purple if not provided. Adapters can pull a color from the
   // cover art for per-item character (Apple Music pattern).
   heroGlowRgb?: string;
+
+  // Render the generic "Get the app" sticky bar even without an item modal.
+  // Item-share pages get it implicitly via `modalContext`; collection pages
+  // (board) opt in here since they have no single-item save flow.
+  showStickyBar?: boolean;
+
+  // Widen the chrome + content container past the 560px mobile default so a
+  // multi-column grid fills desktop width (kills the board page's
+  // dead-space-on-the-right). No effect on phones (already 100%-width).
+  wide?: boolean;
 };
 
 export function renderPage(opts: PageOptions): string {
@@ -72,10 +82,12 @@ export function renderPage(opts: PageOptions): string {
     sharer,
     modalContext,
     heroGlowRgb = '139, 82, 238',
+    showStickyBar = false,
+    wide = false,
   } = opts;
 
   const sharerRow = sharer ? renderSharerRow(sharer) : '';
-  const stickyBar = modalContext ? renderStickyBar() : '';
+  const stickyBar = modalContext || showStickyBar ? renderStickyBar() : '';
   const modal = modalContext ? renderSignupModal() : '';
   const modalScript = modalContext ? renderModalScript(modalContext) : '';
 
@@ -125,7 +137,7 @@ export function renderPage(opts: PageOptions): string {
   <div class="grain" aria-hidden="true"></div>
 
   <!-- Header chrome -->
-  <header class="chrome" role="banner">
+  <header class="chrome${wide ? ' chrome--wide' : ''}" role="banner">
     <a href="/" class="chrome-logo" aria-label="Tastely home">
       <img src="/wordmark.png" alt="Tastely" width="92" height="22" />
     </a>
@@ -135,7 +147,7 @@ export function renderPage(opts: PageOptions): string {
   <!-- Hero glow halo (per-item color, soft) -->
   <div class="hero-glow" aria-hidden="true"></div>
 
-  <main class="container">
+  <main class="container${wide ? ' container--wide' : ''}">
     ${sharerRow}
     ${body}
     ${renderTrustFooter()}
@@ -1166,6 +1178,115 @@ const BASE_STYLES = `<style>
   @media (prefers-reduced-motion: reduce) {
     .hero-glow { animation: none; }
     *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+
+  /* ── Wide layout (board page) — widen chrome + container on desktop so the
+     cover grid fills the width. Phones already render 100%-width via padding. */
+  .chrome--wide, .container--wide { max-width: 1040px; }
+
+  /* ── Board share page — hero + true-to-shape cover grid ── */
+  .board-hero {
+    text-align: center;
+    padding: 6px 0 26px;
+  }
+  .board-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: clamp(28px, 6vw, 40px);
+    line-height: 1.06;
+    letter-spacing: -0.6px;
+    color: var(--text);
+    margin: 0 0 10px;
+    text-wrap: balance;
+  }
+  .board-byline {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--text-3);
+  }
+  .board-desc {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 400;
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--text-2);
+    max-width: 46ch;
+    margin: 14px auto 0;
+  }
+
+  /* CSS-columns masonry → each cover keeps its NATURAL shape (posters 2:3,
+     album/podcast art 1:1) with no JS and no ragged in-row gaps. The shape
+     itself signals the medium (visual vs audio) — the in-app board treatment,
+     mirrored here. Column-major fill order (down then across). */
+  .board-grid {
+    column-count: 2;
+    column-gap: 12px;
+  }
+  @media (min-width: 480px) { .board-grid { column-count: 3; } }
+  @media (min-width: 720px) { .board-grid { column-count: 4; } }
+  @media (min-width: 960px) { .board-grid { column-count: 5; } }
+
+  .cover-tile {
+    break-inside: avoid;
+    margin-bottom: 12px;
+    position: relative;
+    display: block;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.34), 0 0 0 1px rgba(255,255,255,0.05);
+  }
+  .cover-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    background: var(--surface);
+  }
+  .cover-tile--square .cover-img { aspect-ratio: 1 / 1; }
+  .cover-img--placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 14px;
+    background: linear-gradient(160deg, var(--surface-alt), var(--surface));
+  }
+  .cover-img--placeholder span {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1.3;
+    color: var(--text-2);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .cover-scrim {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 58%;
+    background: linear-gradient(transparent, rgba(0,0,0,0.82));
+    pointer-events: none;
+  }
+  .cover-caption {
+    position: absolute;
+    left: 10px; right: 10px; bottom: 9px;
+  }
+  .cover-caption-title {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.25;
+    color: #fff;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
   }
 
   /* ── Legacy classes for board + user routes (pre-S140) ──

@@ -36,16 +36,24 @@ type BoardItemRow = {
 
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
+// Item types whose cover art is square (1:1) — album + podcast art, mirroring
+// the in-app `SQUARE_ART_TYPES`. Everything else (movie, book, tv) is a 2:3
+// poster. The shape itself signals the medium on the grid.
+const SQUARE_TYPES = new Set(['album', 'podcast_series']);
+
 function tmdbAtSize(raw: string, size: string): string {
   if (raw.startsWith('http')) return raw.replace(/\/t\/p\/w\d+\//, `/t/p/${size}/`);
   return `${TMDB_IMAGE_BASE}/${size}${raw}`;
 }
 
-function coverForItem(it: BoardItemRow['items']): string {
+// Grid-scale cover for any vertical. TMDB posters (movie/tv) resized to w342;
+// album/podcast art + book covers used as-is (https-forced); ISBN fallback.
+function gridCoverForItem(it: BoardItemRow['items']): string {
   if (!it) return '';
-  if (it.item_type === 'movie' && it.image_url) return tmdbAtSize(it.image_url, 'w154');
-  if (it.item_type === 'movie' && !it.image_url) return '';
-  if (it.image_url) return it.image_url.replace(/^http:/, 'https:');
+  if (it.image_url) {
+    if (it.image_url.includes('image.tmdb.org')) return tmdbAtSize(it.image_url, 'w342');
+    return it.image_url.replace(/^http:/, 'https:');
+  }
   if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-M.jpg`;
   return '';
 }
@@ -106,22 +114,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   const ogDescription = `${count} ${count === 1 ? 'item' : 'items'} curated by ${creator}`;
   const ogImage = board.cover_url || bigCoverForItem(items[0] ?? null);
 
-  const itemListHtml = items
+  const gridHtml = items
     .map((it) => {
-      const cover = coverForItem(it);
-      const sub =
-        it.item_type === 'movie'
-          ? [it.metadata?.releaseDate?.slice(0, 4), it.metadata?.voteAverage ? `★ ${it.metadata.voteAverage.toFixed(1)}` : '']
-              .filter(Boolean)
-              .join(' · ')
-          : (it.metadata?.authors?.[0] ?? '');
+      const cover = gridCoverForItem(it);
+      const isSquare = SQUARE_TYPES.has(it.item_type);
+      const title = escapeHtml(it.title);
+      const cls = `cover-tile${isSquare ? ' cover-tile--square' : ''}`;
+      if (!cover) {
+        return `
+        <div class="${cls}">
+          <div class="cover-img cover-img--placeholder"><span>${title}</span></div>
+        </div>`;
+      }
       return `
-        <div class="item-card">
-          ${cover ? `<img src="${cover}" alt="${escapeHtml(it.title)}" class="poster" loading="lazy" />` : '<div class="poster-placeholder"></div>'}
-          <div class="item-info">
-            <div class="item-title">${escapeHtml(it.title)}</div>
-            ${sub ? `<div class="item-meta">${escapeHtml(sub)}</div>` : ''}
-          </div>
+        <div class="${cls}">
+          <img src="${cover}" alt="${title}" class="cover-img" loading="lazy" />
+          <div class="cover-scrim" aria-hidden="true"></div>
+          <div class="cover-caption"><div class="cover-caption-title">${title}</div></div>
         </div>`;
     })
     .join('');
@@ -131,20 +140,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     ogDescription,
     ogImage,
     ogUrl,
+    showStickyBar: true,
+    wide: true,
     body: `
-      <div class="header">
-        <div class="tag-label">BOARD</div>
-        <h1>${escapeHtml(board.name)}</h1>
-        <p class="subtitle">by ${escapeHtml(creator)} · ${count} ${count === 1 ? 'item' : 'items'}</p>
-        ${board.description ? `<p class="description">${escapeHtml(board.description)}</p>` : ''}
+      <div class="board-hero">
+        <h1 class="board-title">${escapeHtml(board.name)}</h1>
+        <p class="board-byline">by ${escapeHtml(creator)}</p>
+        ${board.description ? `<p class="board-desc">${escapeHtml(board.description)}</p>` : ''}
       </div>
-      <div class="item-list">
-        ${itemListHtml || '<p class="empty">This board is empty</p>'}
-      </div>
-      <div class="cta">
-        <p class="cta-text">Discover more on Tastely</p>
-        <a href="https://trytastely.com" class="cta-button">Get Tastely</a>
-      </div>
+      ${gridHtml ? `<div class="board-grid">${gridHtml}</div>` : '<p class="empty">This board is empty</p>'}
     `,
   });
 
