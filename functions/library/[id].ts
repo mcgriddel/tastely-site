@@ -3,12 +3,15 @@ import { sbFetch, sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 
 type Env = SupabaseEnv;
 
+type BoardVisibility = 'private' | 'friends' | 'link' | 'public';
+
 type Board = {
   id: string;
   name: string;
   description: string | null;
   user_id: string;
-  is_public: boolean;
+  visibility: BoardVisibility;
+  share_token: string | null;
   cover_url: string | null;
 };
 
@@ -57,15 +60,32 @@ function bigCoverForItem(it: BoardItemRow['items']): string {
 
 export const onRequestGet: PagesFunction<Env> = async ({ params, env, request }) => {
   const boardId = String(params.id);
-  const ogUrl = new URL(request.url).toString();
+  const reqUrl = new URL(request.url);
+  const ogUrl = reqUrl.toString();
+  const shareToken = reqUrl.searchParams.get('t');
 
   const board = await sbFetchOne<Board>(env, {
-    path: `boards?id=eq.${encodeURIComponent(boardId)}&select=id,name,description,user_id,is_public,cover_url&limit=1`,
+    path: `boards?id=eq.${encodeURIComponent(boardId)}&select=id,name,description,user_id,visibility,share_token,cover_url&limit=1`,
     key: 'service',
   });
 
   if (!board) return notFoundPage('Board not found');
-  if (!board.is_public) return notFoundPage('This board is private');
+
+  // Mirror the visibility model (mig 040). The page is publicly served, so only
+  // `public` boards — and `link` boards opened with their matching share token
+  // (`?t=`) — resolve on the web. `friends` boards need the in-app friendship
+  // check; `private` boards are never shareable. Matches the
+  // `get_board_by_share_token` RPC gate (visibility IN ('link','public')).
+  const isPublic = board.visibility === 'public';
+  const isValidLink =
+    board.visibility === 'link' &&
+    !!board.share_token &&
+    !!shareToken &&
+    board.share_token === shareToken;
+
+  if (!isPublic && !isValidLink) {
+    return notFoundPage('This board is private');
+  }
 
   const [boardItems, profile] = await Promise.all([
     sbFetch<BoardItemRow>(env, {
