@@ -738,6 +738,7 @@ type TmdbTv = {
   first_air_date: string;
   genres: { name: string }[];
   created_by: { name: string }[];
+  number_of_seasons?: number;
 };
 
 async function fetchTmdbTv(tmdbId: string, apiKey: string): Promise<TmdbTv | null> {
@@ -816,6 +817,8 @@ function renderTv(a: {
     show?.metadata?.first_air_date ?? show?.metadata?.releaseDate ?? tmdb?.first_air_date ?? '';
   const year = dateStr ? dateStr.slice(0, 4) : '';
   const creator = show?.metadata?.creator ?? tmdb?.created_by?.[0]?.name ?? '';
+  const seasons = tmdb?.number_of_seasons ?? null;
+  const seasonsStr = seasons ? `${seasons} season${seasons === 1 ? '' : 's'}` : '';
 
   const ogTitle = year ? `${title} (${year})` : title;
   const ogDescription = description
@@ -830,11 +833,15 @@ function renderTv(a: {
     saveCtaLabel: `Save ${title} to your watchlist`,
   };
 
+  // Creator → its own subtitle ("Created by …", the showrunner — the TV analogue
+  // of a film's director; a bare name reads as an actor). Meta line carries the
+  // factual chips: year · N seasons · genres.
   const genreSegment = genres.slice(0, 2).filter(Boolean).join(' / ');
-  const metaLine = [year, creator, genreSegment]
+  const metaLine = [year, seasonsStr, genreSegment]
     .filter(Boolean)
     .map((s) => escapeHtml(s))
     .join(' <span class="dot">·</span> ');
+  const subtitle = creator ? `Created by ${escapeHtml(creator)}` : '';
 
   const posterImg = posterUrl
     ? `<img src="${escapeAttr(posterUrl)}" alt="${escapeAttr(title)}" class="detail-cover" />`
@@ -844,6 +851,7 @@ function renderTv(a: {
     <div class="detail-hero">
       ${posterImg}
       <h1 class="detail-title">${escapeHtml(title)}</h1>
+      ${subtitle ? `<p class="detail-subtitle">${subtitle}</p>` : ''}
       ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
     </div>
 

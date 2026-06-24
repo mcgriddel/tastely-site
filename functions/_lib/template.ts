@@ -1398,6 +1398,23 @@ const BASE_STYLES = `<style>
     background: linear-gradient(transparent, rgba(0,0,0,0.82));
     pointer-events: none;
   }
+  /* Per-vertical type glyph, top-left — mirrors the in-app GridCard typeBadge
+     (white line glyph on a 65%-black chip) so a mixed board signals medium. */
+  .cover-type-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    pointer-events: none;
+  }
+  .cover-type-badge svg { width: 13px; height: 13px; display: block; }
   .cover-caption {
     position: absolute;
     left: 10px; right: 10px; bottom: 9px;

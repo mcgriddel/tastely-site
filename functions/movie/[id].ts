@@ -15,8 +15,10 @@ type DbMovie = {
   description: string | null;
   image_url: string | null;
   external_id: string;
+  release_date: string | null;
   metadata: {
     releaseDate?: string;
+    release_date?: string;
     runtime?: number;
     voteAverage?: number;
     director?: string;
@@ -64,7 +66,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
 
   // 1. Try our DB first (cached movies)
   const item = await sbFetchOne<DbMovie>(env, {
-    path: `items?external_id=eq.${encodeURIComponent(tmdbId)}&item_type=eq.movie&select=title,description,image_url,external_id,metadata&limit=1`,
+    path: `items?external_id=eq.${encodeURIComponent(tmdbId)}&item_type=eq.movie&select=title,description,image_url,external_id,release_date,metadata&limit=1`,
     key: 'service',
   });
 
@@ -101,7 +103,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   const title = item?.title ?? tmdb?.title ?? '';
   const description = item?.description ?? tmdb?.overview ?? '';
   const posterPath = item?.image_url ?? tmdb?.poster_path ?? null;
-  const releaseDate = item?.metadata?.releaseDate ?? tmdb?.release_date ?? '';
+  // Canonical `release_date` column first — the camelCase metadata.releaseDate
+  // is never populated (the data is in the column / snake-case metadata).
+  const releaseDate =
+    item?.release_date ?? item?.metadata?.release_date ?? item?.metadata?.releaseDate ?? tmdb?.release_date ?? '';
   const runtime = item?.metadata?.runtime ?? tmdb?.runtime ?? null;
   const director = item?.metadata?.director ?? '';
   const dbGenres = item?.metadata?.genres ?? [];
@@ -160,14 +165,15 @@ function renderMovie(a: RenderArgs): Response {
     saveCtaLabel: `Save ${a.title} to your watchlist`,
   };
 
-  // Year/runtime/director are sequential metadata (dot-separated).
-  // Genres are peer categories — joined by slash, then folded as one
-  // segment onto the dot-separated meta line.
+  // Director gets its own subtitle line ("Directed by …") — mirrors the album's
+  // "by {artist}" and disambiguates the person (a bare name reads as an actor).
+  // The meta line below carries the factual chips: year · runtime · genres.
   const genreSegment = a.genres.slice(0, 2).filter(Boolean).join(' / ');
-  const metaParts = [year, runtimeStr, a.director, genreSegment].filter(Boolean);
+  const metaParts = [year, runtimeStr, genreSegment].filter(Boolean);
   const metaLine = metaParts.length
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
     : '';
+  const subtitle = a.director ? `Directed by ${escapeHtml(a.director)}` : '';
 
   const watchHtml = renderWatchSection(a.watchProviders);
 
@@ -175,6 +181,7 @@ function renderMovie(a: RenderArgs): Response {
     <div class="detail-hero">
       ${posterUrl ? `<img src="${escapeHtml(posterUrl)}" alt="${escapeHtml(a.title)}" class="detail-cover" />` : '<div class="detail-cover"></div>'}
       <h1 class="detail-title">${escapeHtml(a.title)}</h1>
+      ${subtitle ? `<p class="detail-subtitle">${subtitle}</p>` : ''}
       ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
     </div>
 

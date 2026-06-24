@@ -30,8 +30,11 @@ type BoardItemRow = {
     image_url: string | null;
     external_id: string;
     item_type: string;
+    release_date: string | null;
     metadata: {
       releaseDate?: string;
+      release_date?: string;
+      first_air_date?: string;
       voteAverage?: number;
       authors?: string[];
       isbn?: string;
@@ -72,11 +75,34 @@ function gridCoverForItem(it: BoardItemRow['items']): string {
 // nothing. Mirrors how Letterboxd captions a year and Goodreads an author.
 function gridSubtitleForItem(it: NonNullable<BoardItemRow['items']>): string {
   const m = it.metadata ?? {};
-  const year = (m.releaseDate || m.publishedDate || '').slice(0, 4);
+  // Canonical release_date column first — movies/TV store the date there, not in
+  // metadata.releaseDate (camelCase, which is never populated). Then metadata
+  // fallbacks for books (publishedDate) and any legacy shapes.
+  const year = (
+    it.release_date || m.release_date || m.first_air_date || m.releaseDate || m.publishedDate || ''
+  ).slice(0, 4);
   if (it.item_type === 'book') return m.authors?.[0] || year;
   if (it.item_type === 'album') return m.artist_name || year;
   if (it.item_type === 'podcast_series') return m.author || m.artist_name || year;
   return year;
+}
+
+// Per-vertical type glyph for the top-left cover badge — mirrors the in-app
+// GridCard VERTICAL_ICONS (Ionicons: film / book / musical-notes / mic / tv).
+// White line glyph on a 65%-black chip, same as the app's typeBadge.
+function typeBadgeHtml(itemType: string): string {
+  const ICONS: Record<string, string> = {
+    movie: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5V19M17 5V19M3 9.5H7M17 9.5H21M3 14.5H7M17 14.5H21"/>',
+    tv_series: '<rect x="2.5" y="5" width="19" height="12" rx="2"/><path d="M8 20.5H16M12 17V20.5"/>',
+    tv_show: '<rect x="2.5" y="5" width="19" height="12" rx="2"/><path d="M8 20.5H16M12 17V20.5"/>',
+    book: '<path d="M6.5 3H20V19H6.5A2.5 2.5 0 0 0 4 21.5V5.5A2.5 2.5 0 0 1 6.5 3Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>',
+    album: '<circle cx="7" cy="17.5" r="2.5"/><circle cx="17.5" cy="15.5" r="2.5"/><path d="M9.5 17.5V6.5L20 4.5V15.5"/>',
+    podcast_series: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11A6.5 6.5 0 0 0 18.5 11M12 17.5V21M8.5 21H15.5"/>',
+    book_series: '<path d="M6.5 3H20V19H6.5A2.5 2.5 0 0 0 4 21.5V5.5A2.5 2.5 0 0 1 6.5 3Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>',
+  };
+  const glyph = ICONS[itemType];
+  if (!glyph) return '';
+  return `<div class="cover-type-badge" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${glyph}</svg></div>`;
 }
 
 // The web share page for a board item, by vertical. Movies have their own
@@ -140,7 +166,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
 
   const [boardItems, profile] = await Promise.all([
     sbFetch<BoardItemRow>(env, {
-      path: `board_items?board_id=eq.${encodeURIComponent(boardId)}&select=added_at,item_id,items(title,image_url,external_id,item_type,metadata)&order=position.asc&limit=20`,
+      path: `board_items?board_id=eq.${encodeURIComponent(boardId)}&select=added_at,item_id,items(title,image_url,external_id,item_type,release_date,metadata)&order=position.asc&limit=20`,
       key: 'service',
     }),
     sbFetchOne<Profile>(env, {
@@ -183,10 +209,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       const tag = href ? 'a' : 'div';
       const hrefAttr = href ? ` href="${escapeAttr(href)}"` : '';
       const cls = `cover-tile${isSquare ? ' cover-tile--square' : ''}${href ? ' cover-tile--link' : ''}`;
+      const badge = typeBadgeHtml(it.item_type);
       if (!cover) {
         return `
         <${tag} class="${cls}"${hrefAttr}>
           <div class="cover-img cover-img--placeholder"><span>${title}</span></div>
+          ${badge}
         </${tag}>`;
       }
       const captionSub = subtitle ? `<div class="cover-caption-sub">${subtitle}</div>` : '';
@@ -194,6 +222,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
         <${tag} class="${cls}"${hrefAttr}>
           <img src="${cover}" alt="${title}" class="cover-img" loading="lazy" />
           <div class="cover-scrim" aria-hidden="true"></div>
+          ${badge}
           <div class="cover-caption"><div class="cover-caption-title">${title}</div>${captionSub}</div>
         </${tag}>`;
     })
