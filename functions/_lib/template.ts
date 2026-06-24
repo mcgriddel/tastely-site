@@ -198,17 +198,22 @@ function renderTrustFooter(): string {
     </footer>`;
 }
 
-// Single on-page action for share pages. On the web, every action pill opened
-// the same email-capture modal (the only thing the page can actually do), so a
-// 4-pill row (Save/Board/Send/Share) was a fake choice. One honest "Bookmark"
-// button is cleaner and matches the app's shipped vocabulary (Save→Bookmark, M7).
-// Internal action key stays `save` for analytics + icon-map continuity.
+// On-page actions for share pages. On the web, every action pill opens the same
+// email-capture modal (the only thing the page can actually do), so the old
+// 4-pill row (Save/Board/Send/Share) was a fake choice. Pared to two compact
+// pills — Bookmark + Share — the page's two natural intents. "Bookmark" matches
+// the app's shipped vocabulary (Save→Bookmark, M7); the bookmark key stays
+// `save` internally for analytics + icon-map continuity.
 export function renderActionRow(): string {
   return `
-    <div class="actions actions--single">
+    <div class="actions actions--compact">
       <button class="pill pill--bookmark" type="button" data-share-action="save">
         <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
         Bookmark
+      </button>
+      <button class="pill" type="button" data-share-action="share">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Share
       </button>
     </div>`;
 }
@@ -838,17 +843,11 @@ const BASE_STYLES = `<style>
   }
   .pill svg { width: 14px; height: 14px; flex-shrink: 0; }
 
-  /* Single-action layout: one deliberate Bookmark button, centered (not a
-     full-width banner). Neutral by doctrine — the gradient stays on the
-     "Get the app" hero CTA so the two don't compete. */
-  .actions--single { justify-content: center; }
-  .actions--single .pill {
-    flex: 0 0 auto;
-    min-width: 220px;
-    padding: 12px 26px;
-    font-size: 14px;
-  }
-  .actions--single .pill svg { width: 16px; height: 16px; }
+  /* Compact-action layout: a couple of original-size pills, centered (not
+     stretched edge-to-edge like the old 4-pill row). Neutral by doctrine —
+     the gradient stays on the "Get the app" hero CTA so they don't compete. */
+  .actions--compact { justify-content: center; }
+  .actions--compact .pill { flex: 0 0 auto; min-width: 116px; }
 
   /* ── Body sections ── */
   .section { margin: 28px 0; }
