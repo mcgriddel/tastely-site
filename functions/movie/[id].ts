@@ -1,24 +1,14 @@
 import { escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
 import { sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 import { lookupSharer } from '../_lib/sharer';
+import {
+  resolveWatchProviders,
+  renderWatchSection,
+  type CachedWatchProvidersByRegion,
+  type WatchProvidersOut,
+} from '../_lib/watchProviders';
 
 type Env = SupabaseEnv & { TMDB_API_KEY?: string };
-
-type CachedWatchProvider = {
-  logoPath?: string;
-  providerName?: string;
-  providerId?: number;
-};
-
-type CachedWatchProvidersByRegion = Record<
-  string,
-  {
-    flatrate?: CachedWatchProvider[];
-    rent?: CachedWatchProvider[];
-    buy?: CachedWatchProvider[];
-    fetched_at?: string;
-  }
->;
 
 type DbMovie = {
   title: string;
@@ -45,99 +35,7 @@ type TmdbMovie = {
   genres: { name: string }[];
 };
 
-type TmdbWatchProvider = {
-  logo_path: string;
-  provider_name: string;
-  provider_id: number;
-};
-
-type WatchProvidersForRegion = {
-  link: string;
-  flatrate?: TmdbWatchProvider[];
-  rent?: TmdbWatchProvider[];
-  buy?: TmdbWatchProvider[];
-};
-
-type TmdbWatchProvidersResponse = {
-  results: Record<string, WatchProvidersForRegion | undefined>;
-};
-
-type ResolvedProvider = { logoUrl: string; providerName: string };
-
-type WatchProvidersOut = {
-  providers: ResolvedProvider[];
-  tmdbLink: string;
-} | null;
-
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
-
-// Pick the most actionable list — flatrate (subscription) wins, then rent,
-// then buy. A movie that's not on any streaming service still surfaces its
-// rent/buy options rather than rendering an empty section.
-function pickProviderList<T>(region: { flatrate?: T[]; rent?: T[]; buy?: T[] } | undefined): T[] {
-  if (!region) return [];
-  if (region.flatrate?.length) return region.flatrate;
-  if (region.rent?.length) return region.rent;
-  if (region.buy?.length) return region.buy;
-  return [];
-}
-
-function logoUrlFromPath(path?: string): string | null {
-  if (!path) return null;
-  return path.startsWith('http') ? path : `${TMDB_IMAGE_BASE}/w92${path}`;
-}
-
-// First preference — read from the cached metadata.watch_providers if the
-// items row already has it (saves a TMDB API call AND captures rent/buy
-// shapes the live-fetch flatrate filter discards).
-function watchProvidersFromCache(
-  cache: CachedWatchProvidersByRegion | undefined,
-  country: string,
-  tmdbId: string,
-): WatchProvidersOut {
-  if (!cache) return null;
-  const region = cache[country] ?? cache.US;
-  if (!region) return null;
-  const list = pickProviderList(region);
-  if (!list.length) return null;
-  const providers: ResolvedProvider[] = [];
-  for (const p of list) {
-    const logoUrl = logoUrlFromPath(p.logoPath);
-    if (!logoUrl || !p.providerName) continue;
-    providers.push({ logoUrl, providerName: p.providerName });
-  }
-  if (!providers.length) return null;
-  return {
-    providers,
-    tmdbLink: `https://www.themoviedb.org/movie/${tmdbId}/watch?locale=${country}`,
-  };
-}
-
-async function fetchWatchProviders(
-  tmdbId: string,
-  apiKey: string | undefined,
-  country: string,
-): Promise<WatchProvidersOut> {
-  if (!apiKey) return null;
-  try {
-    const res = await fetch(
-      `https://api.themoviedb.org/3/movie/${encodeURIComponent(tmdbId)}/watch/providers?api_key=${apiKey}`,
-    );
-    if (!res.ok) return null;
-    const j = (await res.json()) as TmdbWatchProvidersResponse;
-    const region = j.results[country] ?? j.results.US;
-    if (!region) return null;
-    const list = pickProviderList(region);
-    if (!list.length) return null;
-    const providers: ResolvedProvider[] = list.map((p) => ({
-      logoUrl: logoUrlFromPath(p.logo_path) ?? '',
-      providerName: p.provider_name,
-    }));
-    return { providers: providers.filter((p) => p.logoUrl), tmdbLink: region.link };
-  } catch {
-    return null;
-  }
-}
 
 async function fetchTmdbMovie(tmdbId: string, apiKey: string): Promise<TmdbMovie | null> {
   try {
@@ -181,13 +79,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     ? fetchTmdbMovie(tmdbId, env.TMDB_API_KEY)
     : Promise.resolve(null);
 
-  // Watch providers: prefer the cached metadata.watch_providers (already
-  // captures rent/buy shapes the live flatrate-only filter would discard),
-  // fall back to a fresh TMDB fetch if the cache is missing.
-  const cachedWatch = watchProvidersFromCache(item?.metadata?.watch_providers, country, tmdbId);
-  const watchProvidersPromise: Promise<WatchProvidersOut> = cachedWatch
-    ? Promise.resolve(cachedWatch)
-    : fetchWatchProviders(tmdbId, env.TMDB_API_KEY, country);
+  // Watch providers: cache-first (captures rent/buy shapes the live flatrate-only
+  // filter discards), else a fresh TMDB fetch. Shared with the TV share route.
+  const watchProvidersPromise: Promise<WatchProvidersOut> = resolveWatchProviders({
+    cache: item?.metadata?.watch_providers,
+    country,
+    tmdbId,
+    apiKey: env.TMDB_API_KEY,
+    mediaType: 'movie',
+  });
 
   const [sharer, tmdb, watchProviders] = await Promise.all([
     sharerPromise,
@@ -269,22 +169,7 @@ function renderMovie(a: RenderArgs): Response {
     ? metaParts.map((s) => escapeHtml(s)).join(' <span class="dot">·</span> ')
     : '';
 
-  const watchHtml = a.watchProviders && a.watchProviders.providers.length
-    ? `<div class="section">
-         <p class="section-label">Where to watch</p>
-         <div class="providers">
-           ${a.watchProviders.providers
-             .slice(0, 8)
-             .map(
-               (p) => `<a class="provider-chip provider-chip--link" href="${escapeHtml(a.watchProviders!.tmdbLink)}" target="_blank" rel="noopener">
-                 <img class="provider-icon" src="${escapeHtml(p.logoUrl)}" alt="${escapeHtml(p.providerName)}" loading="lazy" />
-                 <span class="provider-name">${escapeHtml(p.providerName)}</span>
-               </a>`,
-             )
-             .join('')}
-         </div>
-       </div>`
-    : '';
+  const watchHtml = renderWatchSection(a.watchProviders);
 
   const body = `
     <div class="detail-hero">

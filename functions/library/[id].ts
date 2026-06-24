@@ -94,6 +94,8 @@ function itemShareHref(it: NonNullable<BoardItemRow['items']>, itemId: string): 
       return `/item/${encodeURIComponent(itemId)}?type=album`;
     case 'podcast_series':
       return `/item/${encodeURIComponent(itemId)}?type=podcast`;
+    case 'tv_series':
+      return `/item/${encodeURIComponent(itemId)}?type=tv`;
     default:
       return null;
   }

@@ -1,8 +1,14 @@
 import { escapeAttr, escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
 import { sbFetch, sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 import { lookupSharer } from '../_lib/sharer';
+import {
+  resolveWatchProviders,
+  renderWatchSection,
+  type CachedWatchProvidersByRegion,
+  type WatchProvidersOut,
+} from '../_lib/watchProviders';
 
-type Env = SupabaseEnv;
+type Env = SupabaseEnv & { TMDB_API_KEY?: string };
 
 type DbBook = {
   title: string;
@@ -190,6 +196,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   }
   if (shareType === 'podcast') {
     return await renderPodcastRoute(env, volumeId, ogUrl, sharerPromise);
+  }
+  if (shareType === 'tv') {
+    // CF edges set request.cf.country to the viewer's 2-letter ISO — region for
+    // watch providers (same approach as the movie route).
+    const country = (request as unknown as { cf?: { country?: string } }).cf?.country ?? 'US';
+    return await renderTvRoute(env, volumeId, ogUrl, sharerPromise, country);
   }
 
   // 1. Multi-shape DB lookup (Theo-of-Golden fix)
@@ -718,6 +730,191 @@ async function renderAlbum(
     ogImage,
     ogUrl,
     sharer,
+    modalContext,
+    body,
+  });
+
+  return htmlResponse(html, 86400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TV (?type=tv)
+//
+// Same shared chrome as the movie page. TV `items` rows are sparse (title /
+// description / cover only — no genres, date, or watch-provider cache), so
+// genres + year + region-aware watch providers are filled from TMDB live (the
+// worker carries TMDB_API_KEY, same as the movie route). "Where to watch" routes
+// through the shared `_lib/watchProviders` helper (mediaType 'tv') so it stays in
+// lockstep with the movie page.
+// ─────────────────────────────────────────────────────────────────────────
+
+const TMDB_IMG = 'https://image.tmdb.org/t/p';
+
+type DbTv = {
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  external_id: string;
+  external_source: string | null;
+  metadata: {
+    genres?: string[];
+    first_air_date?: string;
+    releaseDate?: string;
+    creator?: string;
+    watch_providers?: CachedWatchProvidersByRegion;
+  } | null;
+};
+
+type TmdbTv = {
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  first_air_date: string;
+  genres: { name: string }[];
+  created_by: { name: string }[];
+};
+
+async function fetchTmdbTv(tmdbId: string, apiKey: string): Promise<TmdbTv | null> {
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/tv/${encodeURIComponent(tmdbId)}?api_key=${apiKey}&language=en-US`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as TmdbTv;
+  } catch {
+    return null;
+  }
+}
+
+async function lookupTv(env: Env, id: string): Promise<DbTv | null> {
+  const cols = 'title,description,image_url,external_id,external_source,metadata';
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  if (isUuid) {
+    const byUuid = await sbFetchOne<DbTv>(env, {
+      path: `items?id=eq.${encodeURIComponent(id)}&item_type=eq.tv_series&select=${cols}&limit=1`,
+      key: 'service',
+    });
+    if (byUuid) return byUuid;
+  }
+  return await sbFetchOne<DbTv>(env, {
+    path: `items?external_id=eq.${encodeURIComponent(id)}&item_type=eq.tv_series&select=${cols}&limit=1`,
+    key: 'service',
+  });
+}
+
+async function renderTvRoute(
+  env: Env,
+  id: string,
+  ogUrl: string,
+  sharerPromise: ReturnType<typeof lookupSharer>,
+  country: string,
+): Promise<Response> {
+  const show = await lookupTv(env, id);
+  // Bare TMDB id from external_id (tmdb:tv:{n}); fall back to the URL param if it
+  // already looks like a bare numeric id.
+  const tmdbId = show?.external_id?.replace(/^tmdb:tv:/, '') ?? (/^\d+$/.test(id) ? id : '');
+  const apiKey = env.TMDB_API_KEY;
+  // Sparse TV rows → fill genres/year/creator from TMDB.
+  const needsTmdb = !show || !show.metadata?.genres?.length;
+  const tmdbPromise = tmdbId && apiKey && needsTmdb ? fetchTmdbTv(tmdbId, apiKey) : Promise.resolve(null);
+  const watchPromise: Promise<WatchProvidersOut> = tmdbId
+    ? resolveWatchProviders({ cache: show?.metadata?.watch_providers, country, tmdbId, apiKey, mediaType: 'tv' })
+    : Promise.resolve(null);
+
+  const [sharer, tmdb, watch] = await Promise.all([sharerPromise, tmdbPromise, watchPromise]);
+  if (!show && !tmdb) return notFoundPage('Show not found');
+
+  return renderTv({ show, tmdb, tmdbId, watch, ogUrl, sharer });
+}
+
+function renderTv(a: {
+  show: DbTv | null;
+  tmdb: TmdbTv | null;
+  tmdbId: string;
+  watch: WatchProvidersOut;
+  ogUrl: string;
+  sharer: Awaited<ReturnType<typeof lookupSharer>>;
+}): Response {
+  const { show, tmdb } = a;
+  const title = show?.title ?? tmdb?.name ?? '';
+  const description = show?.description ?? tmdb?.overview ?? '';
+  const rawPoster = show?.image_url ?? tmdb?.poster_path ?? null;
+  const posterUrl = rawPoster
+    ? rawPoster.startsWith('http')
+      ? rawPoster.replace(/\/t\/p\/w\d+\//, '/t/p/w500/')
+      : `${TMDB_IMG}/w500${rawPoster}`
+    : '';
+  const dbGenres = show?.metadata?.genres ?? [];
+  const genres = dbGenres.length ? dbGenres : (tmdb?.genres ?? []).map((g) => g.name);
+  const dateStr =
+    show?.metadata?.first_air_date ?? show?.metadata?.releaseDate ?? tmdb?.first_air_date ?? '';
+  const year = dateStr ? dateStr.slice(0, 4) : '';
+  const creator = show?.metadata?.creator ?? tmdb?.created_by?.[0]?.name ?? '';
+
+  const ogTitle = year ? `${title} (${year})` : title;
+  const ogDescription = description
+    ? description.slice(0, 150) + (description.length > 150 ? '…' : '')
+    : 'Discover this show on Tastely';
+
+  const modalContext: ModalContext = {
+    itemTitle: title,
+    itemType: 'tv_series',
+    externalId: show?.external_id ?? (a.tmdbId ? `tmdb:tv:${a.tmdbId}` : ''),
+    externalSource: show?.external_source ?? 'tmdb',
+    saveCtaLabel: `Save ${title} to your watchlist`,
+  };
+
+  const genreSegment = genres.slice(0, 2).filter(Boolean).join(' / ');
+  const metaLine = [year, creator, genreSegment]
+    .filter(Boolean)
+    .map((s) => escapeHtml(s))
+    .join(' <span class="dot">·</span> ');
+
+  const posterImg = posterUrl
+    ? `<img src="${escapeAttr(posterUrl)}" alt="${escapeAttr(title)}" class="detail-cover" />`
+    : '<div class="detail-cover"></div>';
+
+  const body = `
+    <div class="detail-hero">
+      ${posterImg}
+      <h1 class="detail-title">${escapeHtml(title)}</h1>
+      ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
+    </div>
+
+    <div class="actions">
+      <button class="pill" type="button" data-share-action="save">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Save
+      </button>
+      <button class="pill" type="button" data-share-action="board">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8V16M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Board
+      </button>
+      <button class="pill" type="button" data-share-action="send">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Send
+      </button>
+      <button class="pill" type="button" data-share-action="share">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Share
+      </button>
+    </div>
+
+    ${description ? `
+    <div class="section">
+      <p class="section-label">About</p>
+      <p class="section-prose">${escapeHtml(description)}</p>
+    </div>` : ''}
+
+    ${renderWatchSection(a.watch)}
+  `;
+
+  const html = renderPage({
+    ogTitle,
+    ogDescription,
+    ogImage: posterUrl,
+    ogUrl: a.ogUrl,
+    sharer: a.sharer,
     modalContext,
     body,
   });
