@@ -5,6 +5,8 @@ type Env = SupabaseEnv;
 
 type BoardVisibility = 'private' | 'friends' | 'link' | 'public';
 
+type BoardSort = 'custom' | 'date' | 'alpha';
+
 type Board = {
   id: string;
   name: string;
@@ -13,12 +15,16 @@ type Board = {
   visibility: BoardVisibility;
   share_token: string | null;
   cover_url: string | null;
+  // The owner's persisted item order (set in-app). Travels with the board so
+  // the shared page mirrors how the owner arranged it. Null/absent → custom.
+  display_prefs: { sort?: BoardSort | null } | null;
 };
 
 type Profile = { username: string | null; display_name: string | null };
 
 type BoardItemRow = {
   item_id: string;
+  added_at: string | null;
   items: {
     title: string;
     image_url: string | null;
@@ -73,7 +79,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   const shareToken = reqUrl.searchParams.get('t');
 
   const board = await sbFetchOne<Board>(env, {
-    path: `boards?id=eq.${encodeURIComponent(boardId)}&select=id,name,description,user_id,visibility,share_token,cover_url&limit=1`,
+    path: `boards?id=eq.${encodeURIComponent(boardId)}&select=id,name,description,user_id,visibility,share_token,cover_url,display_prefs&limit=1`,
     key: 'service',
   });
 
@@ -97,7 +103,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
 
   const [boardItems, profile] = await Promise.all([
     sbFetch<BoardItemRow>(env, {
-      path: `board_items?board_id=eq.${encodeURIComponent(boardId)}&select=item_id,items(title,image_url,external_id,item_type,metadata)&order=position.asc&limit=20`,
+      path: `board_items?board_id=eq.${encodeURIComponent(boardId)}&select=added_at,item_id,items(title,image_url,external_id,item_type,metadata)&order=position.asc&limit=20`,
       key: 'service',
     }),
     sbFetchOne<Profile>(env, {
@@ -106,7 +112,19 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     }),
   ]);
 
-  const items = (boardItems ?? []).map((bi) => bi.items).filter((x): x is NonNullable<typeof x> => !!x);
+  // Mirror the board's persisted sort (set in-app, display_prefs.sort) so the
+  // recipient sees the same order. Rows are fetched in position order, which IS
+  // the 'custom' order; re-sort for the other two. Comparators match the app
+  // (alpha: title A→Z; date: most recently added first).
+  const sort: BoardSort = board.display_prefs?.sort ?? 'custom';
+  const sortedRows = [...(boardItems ?? [])];
+  if (sort === 'alpha') {
+    sortedRows.sort((a, b) => (a.items?.title ?? '').localeCompare(b.items?.title ?? ''));
+  } else if (sort === 'date') {
+    sortedRows.sort((a, b) => (b.added_at ?? '').localeCompare(a.added_at ?? ''));
+  }
+
+  const items = sortedRows.map((bi) => bi.items).filter((x): x is NonNullable<typeof x> => !!x);
   const count = items.length;
   const creator = profile?.display_name || profile?.username || 'someone';
 
