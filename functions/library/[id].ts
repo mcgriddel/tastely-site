@@ -160,13 +160,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
     ogUrl,
     showStickyBar: true,
     wide: true,
+    boardLayout: true,
     body: `
       <div class="board-hero">
         <h1 class="board-title">${escapeHtml(board.name)}</h1>
         <p class="board-byline">by ${escapeHtml(creator)}</p>
         ${board.description ? `<p class="board-desc">${escapeHtml(board.description)}</p>` : ''}
       </div>
-      ${gridHtml ? `<div class="board-grid">${gridHtml}</div>` : '<p class="empty">This board is empty</p>'}
+      ${gridHtml ? `<div class="board-grid" id="board-grid">${gridHtml}</div>` : '<p class="empty">This board is empty</p>'}
     `,
   });
 

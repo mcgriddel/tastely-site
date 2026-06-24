@@ -68,6 +68,12 @@ export type PageOptions = {
   // multi-column grid fills desktop width (kills the board page's
   // dead-space-on-the-right). No effect on phones (already 100%-width).
   wide?: boolean;
+
+  // Inject the board cover-grid packing script — shortest-column-first masonry
+  // (mirrors the in-app board) so a sorted board reads in roughly source order
+  // left-to-right instead of CSS-columns' fill-one-column-then-the-next. Targets
+  // `#board-grid`; no-op on pages without it.
+  boardLayout?: boolean;
 };
 
 export function renderPage(opts: PageOptions): string {
@@ -84,10 +90,12 @@ export function renderPage(opts: PageOptions): string {
     heroGlowRgb = '139, 82, 238',
     showStickyBar = false,
     wide = false,
+    boardLayout = false,
   } = opts;
 
   const sharerRow = sharer ? renderSharerRow(sharer) : '';
   const stickyBar = modalContext || showStickyBar ? renderStickyBar() : '';
+  const boardLayoutScript = boardLayout ? renderBoardLayoutScript() : '';
   const modal = modalContext ? renderSignupModal() : '';
   const modalScript = modalContext ? renderModalScript(modalContext) : '';
 
@@ -157,6 +165,7 @@ export function renderPage(opts: PageOptions): string {
   ${modal}
 
   ${modalScript}
+  ${boardLayoutScript}
 </body>
 </html>`;
 }
@@ -472,6 +481,65 @@ function renderModalScript(ctx: ModalContext): string {
   // Error retry → back to signup
   var retryBtn = $('#error-retry');
   if (retryBtn) retryBtn.addEventListener('click', function(){ setState('signup'); });
+})();
+</script>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Board cover-grid packing — shortest-column-first masonry (mirrors the in-app
+// board's computeFrames). CSS columns alone fill one column top-to-bottom then
+// the next, so a sorted board reads DOWN columns; this packs each tile into the
+// currently shortest column in source order, so it reads roughly left-to-right.
+// Heights are derived from each tile's aspect (square 1:1 vs poster 2:3) — no
+// DOM measurement needed. Progressive enhancement: without JS the CSS-columns
+// fallback still renders every cover, just in column-major order.
+// ─────────────────────────────────────────────────────────────────────────
+
+function renderBoardLayoutScript(): string {
+  return `
+<script>
+(function(){
+  var grid = document.getElementById('board-grid');
+  if (!grid) return;
+  // Capture tiles once, in source (sorted) order.
+  var tiles = Array.prototype.slice.call(grid.querySelectorAll('.cover-tile'));
+  if (!tiles.length) return;
+  var GAP = 12;
+  function colCount(w){ return w < 480 ? 2 : w < 720 ? 3 : w < 960 ? 4 : 5; }
+  var lastCols = 0;
+  function layout(){
+    var w = grid.clientWidth;
+    if (!w) return;
+    var cols = colCount(w);
+    // Column ASSIGNMENT only depends on the breakpoint (heights are ratio-based,
+    // so they scale uniformly with width) — skip rework within a breakpoint.
+    if (cols === lastCols && grid.classList.contains('packed')) return;
+    lastCols = cols;
+    var colW = (w - (cols - 1) * GAP) / cols;
+    var wrappers = [], heights = [];
+    for (var i = 0; i < cols; i++){
+      var d = document.createElement('div'); d.className = 'board-col';
+      wrappers.push(d); heights.push(0);
+    }
+    for (var t = 0; t < tiles.length; t++){
+      var tile = tiles[t];
+      var isSq = tile.classList.contains('cover-tile--square');
+      var h = colW * (isSq ? 1 : 1.5);
+      var min = 0;
+      for (var c = 1; c < cols; c++){ if (heights[c] < heights[min]) min = c; }
+      wrappers[min].appendChild(tile);
+      heights[min] += h + GAP;
+    }
+    grid.innerHTML = '';
+    grid.classList.add('packed');
+    for (var k = 0; k < wrappers.length; k++) grid.appendChild(wrappers[k]);
+  }
+  layout();
+  var raf;
+  window.addEventListener('resize', function(){
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(layout);
+  });
 })();
 </script>`;
 }
@@ -1226,6 +1294,24 @@ const BASE_STYLES = `<style>
   @media (min-width: 480px) { .board-grid { column-count: 3; } }
   @media (min-width: 720px) { .board-grid { column-count: 4; } }
   @media (min-width: 960px) { .board-grid { column-count: 5; } }
+
+  /* JS-upgraded layout: shortest-column-first packing. The script swaps the
+     CSS-columns fallback for a flex row of equal columns (reads left-to-right
+     in source order). */
+  .board-grid.packed {
+    column-count: initial;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .board-col {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .board-col .cover-tile { margin-bottom: 0; }
 
   .cover-tile {
     break-inside: avoid;
