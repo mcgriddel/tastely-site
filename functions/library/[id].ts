@@ -37,6 +37,7 @@ type BoardItemRow = {
       isbn?: string;
       publishedDate?: string;
       artist_name?: string;
+      author?: string;
     } | null;
   } | null;
 };
@@ -73,7 +74,8 @@ function gridSubtitleForItem(it: NonNullable<BoardItemRow['items']>): string {
   const m = it.metadata ?? {};
   const year = (m.releaseDate || m.publishedDate || '').slice(0, 4);
   if (it.item_type === 'book') return m.authors?.[0] || year;
-  if (it.item_type === 'album' || it.item_type === 'podcast_series') return m.artist_name || year;
+  if (it.item_type === 'album') return m.artist_name || year;
+  if (it.item_type === 'podcast_series') return m.author || m.artist_name || year;
   return year;
 }
 
@@ -90,6 +92,8 @@ function itemShareHref(it: NonNullable<BoardItemRow['items']>, itemId: string): 
       return `/item/${encodeURIComponent(itemId)}?type=book`;
     case 'album':
       return `/item/${encodeURIComponent(itemId)}?type=album`;
+    case 'podcast_series':
+      return `/item/${encodeURIComponent(itemId)}?type=podcast`;
     default:
       return null;
   }

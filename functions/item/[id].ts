@@ -188,6 +188,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   if (shareType === 'album') {
     return await renderAlbumRoute(env, volumeId, ogUrl, sharerPromise);
   }
+  if (shareType === 'podcast') {
+    return await renderPodcastRoute(env, volumeId, ogUrl, sharerPromise);
+  }
 
   // 1. Multi-shape DB lookup (Theo-of-Golden fix)
   const item = await multiLookupBook(env, volumeId);
@@ -677,6 +680,167 @@ async function renderAlbum(
       <h1 class="detail-title">${escapeHtml(album.title)}</h1>
       ${artist ? `<p class="detail-subtitle">by ${escapeHtml(artist)}</p>` : ''}
       ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
+    </div>
+
+    <div class="actions">
+      <button class="pill" type="button" data-share-action="save">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Save
+      </button>
+      <button class="pill" type="button" data-share-action="board">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8V16M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Board
+      </button>
+      <button class="pill" type="button" data-share-action="send">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Send
+      </button>
+      <button class="pill" type="button" data-share-action="share">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Share
+      </button>
+    </div>
+
+    ${cleanDesc ? `
+    <div class="section">
+      <p class="section-label">About</p>
+      <p class="section-prose">${escapeHtml(cleanDesc)}</p>
+    </div>` : ''}
+
+    ${listenHtml}
+  `;
+
+  const ogImage = await resolveOgImageUrl(cover);
+
+  const html = renderPage({
+    ogTitle,
+    ogDescription,
+    ogImage,
+    ogUrl,
+    sharer,
+    modalContext,
+    body,
+  });
+
+  return htmlResponse(html, 86400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Podcast (?type=podcast)
+//
+// Same shared-chrome shape as the album/book renderers. "Where to listen" is a
+// 1:1 port of the in-app podcast set (`app/src/modules/podcasts/utils/
+// podcastListenLinks.ts`): Apple Podcasts · Spotify · YouTube — prefer the stored
+// canonical URL (metadata.apple_url / .youtube_url; Spotify is search-only), fall
+// back to a search link, and honor metadata.listen_unavailable. Keep in sync with
+// that file (same set, order, URL logic, logos).
+// ─────────────────────────────────────────────────────────────────────────
+
+type DbPodcast = {
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  external_id: string;
+  external_source: string | null;
+  metadata: {
+    author?: string;
+    apple_url?: string;
+    spotify_url?: string;
+    youtube_url?: string;
+    listen_unavailable?: string[];
+  } | null;
+};
+
+// `key` = the in-app PodcastPlatformKey (for listen_unavailable matching);
+// `logo` = the PNG filename served from /retailers/*.png.
+const PODCAST_PLATFORMS: {
+  key: string;
+  logo: string;
+  label: string;
+  canonical: (m: DbPodcast['metadata']) => string | undefined;
+  build: (canonical: string | null, q: string) => string;
+}[] = [
+  { key: 'apple_podcasts', logo: 'applepodcasts', label: 'Apple Podcasts',
+    canonical: (m) => m?.apple_url, build: (c, q) => c ?? `https://podcasts.apple.com/search?term=${q}` },
+  { key: 'spotify', logo: 'spotify', label: 'Spotify',
+    canonical: (m) => m?.spotify_url, build: (c, q) => c ?? `https://open.spotify.com/search/${q}` },
+  { key: 'youtube', logo: 'youtube', label: 'YouTube',
+    canonical: (m) => m?.youtube_url, build: (c, q) => c ?? `https://www.youtube.com/results?search_query=${q}` },
+];
+
+async function lookupPodcast(env: Env, id: string): Promise<DbPodcast | null> {
+  const cols = 'title,description,image_url,external_id,external_source,metadata';
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  if (isUuid) {
+    const byUuid = await sbFetchOne<DbPodcast>(env, {
+      path: `items?id=eq.${encodeURIComponent(id)}&item_type=eq.podcast_series&select=${cols}&limit=1`,
+      key: 'service',
+    });
+    if (byUuid) return byUuid;
+  }
+  return await sbFetchOne<DbPodcast>(env, {
+    path: `items?external_id=eq.${encodeURIComponent(id)}&item_type=eq.podcast_series&select=${cols}&limit=1`,
+    key: 'service',
+  });
+}
+
+async function renderPodcastRoute(
+  env: Env,
+  id: string,
+  ogUrl: string,
+  sharerPromise: ReturnType<typeof lookupSharer>,
+): Promise<Response> {
+  const show = await lookupPodcast(env, id);
+  if (!show) return notFoundPage('Podcast not found');
+  const sharer = await sharerPromise;
+  return await renderPodcast(show, ogUrl, sharer);
+}
+
+async function renderPodcast(
+  show: DbPodcast,
+  ogUrl: string,
+  sharer: Awaited<ReturnType<typeof lookupSharer>>,
+): Promise<Response> {
+  const author = show.metadata?.author ?? '';
+  const cover = show.image_url ? show.image_url.replace(/^http:/, 'https:') : '';
+
+  const ogTitle = author ? `${show.title} by ${author}` : show.title;
+  const cleanDesc = show.description ? stripHtmlPreservingBreaks(show.description) : '';
+  const ogDescriptionSrc = cleanDesc.replace(/\s*\n+\s*/g, ' ');
+  const ogDescription = ogDescriptionSrc
+    ? ogDescriptionSrc.slice(0, 150) + (ogDescriptionSrc.length > 150 ? '…' : '')
+    : 'Discover this podcast on Tastely';
+
+  const modalContext: ModalContext = {
+    itemTitle: show.title,
+    itemType: 'podcast_series',
+    externalId: show.external_id,
+    externalSource: show.external_source ?? 'rss',
+    saveCtaLabel: `Save ${show.title} to your library`,
+  };
+
+  const coverImg = cover
+    ? `<img src="${escapeAttr(cover)}" alt="${escapeAttr(show.title)}" class="detail-cover detail-cover-album" />`
+    : '<div class="detail-cover detail-cover-album"></div>';
+
+  const hidden = new Set(show.metadata?.listen_unavailable ?? []);
+  const q = encodeURIComponent(show.title);
+  const chips = PODCAST_PLATFORMS.filter((p) => !hidden.has(p.key)).map((p) => {
+    const url = p.build(p.canonical(show.metadata) ?? null, q);
+    return `<a class="provider-chip provider-chip--link" href="${escapeAttr(url)}" target="_blank" rel="nofollow noopener"><img src="/retailers/${p.logo}.png" alt="" class="provider-icon" loading="lazy" />${escapeHtml(p.label)}</a>`;
+  });
+  const listenHtml = chips.length
+    ? `<div class="section">
+         <p class="section-label">Where to listen</p>
+         <div class="providers">${chips.join('')}</div>
+       </div>`
+    : '';
+
+  const body = `
+    <div class="detail-hero">
+      ${coverImg}
+      <h1 class="detail-title">${escapeHtml(show.title)}</h1>
+      ${author ? `<p class="detail-subtitle">by ${escapeHtml(author)}</p>` : ''}
     </div>
 
     <div class="actions">
