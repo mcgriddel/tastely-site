@@ -198,10 +198,25 @@ function renderTrustFooter(): string {
     </footer>`;
 }
 
+// Single on-page action for share pages. On the web, every action pill opened
+// the same email-capture modal (the only thing the page can actually do), so a
+// 4-pill row (Save/Board/Send/Share) was a fake choice. One honest "Bookmark"
+// button is cleaner and matches the app's shipped vocabulary (Save→Bookmark, M7).
+// Internal action key stays `save` for analytics + icon-map continuity.
+export function renderActionRow(): string {
+  return `
+    <div class="actions actions--single">
+      <button class="pill pill--bookmark" type="button" data-share-action="save">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Bookmark
+      </button>
+    </div>`;
+}
+
 function renderStickyBar(): string {
   return `
     <div class="sticky-bar" role="complementary">
-      <span class="sticky-bar-text">Track what you love on Tastely</span>
+      <span class="sticky-bar-text">Follow what you love on Tastely</span>
       <a href="https://apps.apple.com/app/tastely/id${APP_STORE_ID}" class="sticky-bar-cta" data-share-event="sticky_bar_tapped">Get the app</a>
     </div>`;
 }
@@ -225,8 +240,8 @@ function renderSignupModal(): string {
               </svg>
             </div>
           </div>
-          <h2 class="modal-title" id="modal-title">Save this to your library</h2>
-          <p class="modal-subtitle">Tastely keeps the things you love organized — and recommends what's next.</p>
+          <h2 class="modal-title" id="modal-title">Bookmark this to your library</h2>
+          <p class="modal-subtitle">Follow what you love on Tastely.</p>
 
           <div class="modal-actions">
             <a href="https://apps.apple.com/app/tastely/id${APP_STORE_ID}" class="modal-btn modal-btn-oauth" data-share-event="modal_continue_in_app">
@@ -394,12 +409,12 @@ function renderModalScript(ctx: ModalContext): string {
     }
     if (titleEl && action) {
       var copy = ({
-        save: 'Save ' + truncate(CTX.itemTitle, 36) + ' to your library',
+        save: 'Bookmark ' + truncate(CTX.itemTitle, 36) + ' to your library',
         board: 'Add ' + truncate(CTX.itemTitle, 32) + ' to a board',
         send: 'Send ' + truncate(CTX.itemTitle, 36) + ' to a friend',
         share: 'Share ' + truncate(CTX.itemTitle, 36) + ' with friends',
         rate: 'Rate ' + truncate(CTX.itemTitle, 36),
-      })[action] || ('Save ' + truncate(CTX.itemTitle, 36));
+      })[action] || ('Bookmark ' + truncate(CTX.itemTitle, 36));
       titleEl.textContent = copy;
     }
     modal.setAttribute('aria-hidden', 'false');
@@ -822,6 +837,18 @@ const BASE_STYLES = `<style>
     transform: translateY(-1px);
   }
   .pill svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  /* Single-action layout: one deliberate Bookmark button, centered (not a
+     full-width banner). Neutral by doctrine — the gradient stays on the
+     "Get the app" hero CTA so the two don't compete. */
+  .actions--single { justify-content: center; }
+  .actions--single .pill {
+    flex: 0 0 auto;
+    min-width: 220px;
+    padding: 12px 26px;
+    font-size: 14px;
+  }
+  .actions--single .pill svg { width: 16px; height: 16px; }
 
   /* ── Body sections ── */
   .section { margin: 28px 0; }

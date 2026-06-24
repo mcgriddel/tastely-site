@@ -1,4 +1,4 @@
-import { escapeHtml, htmlResponse, notFoundPage, renderPage, type ModalContext } from '../_lib/template';
+import { escapeHtml, htmlResponse, notFoundPage, renderActionRow, renderPage, type ModalContext } from '../_lib/template';
 import { sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 import { lookupSharer } from '../_lib/sharer';
 import {
@@ -178,24 +178,7 @@ function renderMovie(a: RenderArgs): Response {
       ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
     </div>
 
-    <div class="actions">
-      <button class="pill" type="button" data-share-action="save">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-        Save
-      </button>
-      <button class="pill" type="button" data-share-action="board">
-        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8V16M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        Board
-      </button>
-      <button class="pill" type="button" data-share-action="send">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
-        Send
-      </button>
-      <button class="pill" type="button" data-share-action="share">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Share
-      </button>
-    </div>
+    ${renderActionRow()}
 
     ${a.description ? `
     <div class="section">
