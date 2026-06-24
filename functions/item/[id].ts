@@ -179,6 +179,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
 
   const sharerPromise = lookupSharer(env, fromUserId);
 
+  // Type-aware dispatch. This route was originally book-only; the app now shares
+  // albums (and eventually podcasts/TV) through the same `/item/[id]` URL with a
+  // `?type=` discriminator (see app `src/shared/utils/share.ts`). Route non-book
+  // types to their renderer; book stays the default so legacy `/item/[id]?type=book`
+  // — and any older un-typed book link — keeps working unchanged.
+  const shareType = url.searchParams.get('type');
+  if (shareType === 'album') {
+    return await renderAlbumRoute(env, volumeId, ogUrl, sharerPromise);
+  }
+
   // 1. Multi-shape DB lookup (Theo-of-Golden fix)
   const item = await multiLookupBook(env, volumeId);
 
@@ -541,6 +551,170 @@ async function renderBook(a: RenderArgs): Promise<Response> {
     ogImage,
     ogUrl: a.ogUrl,
     sharer: a.sharer,
+    modalContext,
+    body,
+  });
+
+  return htmlResponse(html, 86400);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Album (?type=album)
+//
+// Mirrors the book renderer's shape (shared chrome via renderPage; detail-hero +
+// action pills + "Where to listen" providers + About) so the album share-landing
+// is visually consistent with the movie + book pages. The "Where to listen" links
+// are CUSTOM per-platform SEARCH-URLs built from artist + title — a 1:1 port of the
+// in-app chooser (`app/src/modules/music/components/MusicListenCTAs.tsx`). Keep the
+// two in sync: same platform set, same order, same URL logic, same logos.
+// ─────────────────────────────────────────────────────────────────────────
+
+type DbAlbum = {
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  external_id: string;
+  external_source: string | null;
+  release_date: string | null;
+  metadata: {
+    artist_name?: string;
+    genres?: string[];
+  } | null;
+};
+
+// Logo `key` MUST match the PNG filename served from /retailers/*.png.
+const MUSIC_PLATFORMS: { key: string; label: string; url: (q: string) => string }[] = [
+  { key: 'spotify', label: 'Spotify', url: (q) => `https://open.spotify.com/search/${q}` },
+  { key: 'applemusic', label: 'Apple Music', url: (q) => `https://music.apple.com/us/search?term=${q}` },
+  { key: 'youtubemusic', label: 'YouTube Music', url: (q) => `https://music.youtube.com/search?q=${q}` },
+  { key: 'amazonmusic', label: 'Amazon Music', url: (q) => `https://music.amazon.com/search/${q}` },
+  { key: 'tidal', label: 'Tidal', url: (q) => `https://tidal.com/search?q=${q}` },
+];
+
+async function lookupAlbum(env: Env, id: string): Promise<DbAlbum | null> {
+  const cols = 'title,description,image_url,external_id,external_source,release_date,metadata';
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  // The app shares albums by canonical items.id UUID (substrate-first); try it
+  // first, then fall back to external_id (mbid:release-group:<uuid>).
+  if (isUuid) {
+    const byUuid = await sbFetchOne<DbAlbum>(env, {
+      path: `items?id=eq.${encodeURIComponent(id)}&item_type=eq.album&select=${cols}&limit=1`,
+      key: 'service',
+    });
+    if (byUuid) return byUuid;
+  }
+  return await sbFetchOne<DbAlbum>(env, {
+    path: `items?external_id=eq.${encodeURIComponent(id)}&item_type=eq.album&select=${cols}&limit=1`,
+    key: 'service',
+  });
+}
+
+async function renderAlbumRoute(
+  env: Env,
+  id: string,
+  ogUrl: string,
+  sharerPromise: ReturnType<typeof lookupSharer>,
+): Promise<Response> {
+  const album = await lookupAlbum(env, id);
+  if (!album) return notFoundPage('Album not found');
+  const sharer = await sharerPromise;
+  return await renderAlbum(album, ogUrl, sharer);
+}
+
+async function renderAlbum(
+  album: DbAlbum,
+  ogUrl: string,
+  sharer: Awaited<ReturnType<typeof lookupSharer>>,
+): Promise<Response> {
+  const artist = album.metadata?.artist_name ?? '';
+  const year = album.release_date ? album.release_date.slice(0, 4) : '';
+  const genres = (album.metadata?.genres ?? [])
+    .slice(0, 3)
+    .map((g) => g.replace(/\b\w/g, (c) => c.toUpperCase()));
+  const cover = album.image_url ? album.image_url.replace(/^http:/, 'https:') : '';
+
+  const ogTitle = artist ? `${album.title} by ${artist}` : album.title;
+  const cleanDesc = album.description ? stripHtmlPreservingBreaks(album.description) : '';
+  const ogDescriptionSrc = cleanDesc.replace(/\s*\n+\s*/g, ' ');
+  const ogDescription = ogDescriptionSrc
+    ? ogDescriptionSrc.slice(0, 150) + (ogDescriptionSrc.length > 150 ? '…' : '')
+    : 'Discover this album on Tastely';
+
+  const modalContext: ModalContext = {
+    itemTitle: album.title,
+    itemType: 'album',
+    externalId: album.external_id,
+    externalSource: album.external_source ?? 'musicbrainz',
+    saveCtaLabel: `Save ${album.title} to your library`,
+  };
+
+  const metaLine = [year, ...genres]
+    .filter(Boolean)
+    .map((s) => escapeHtml(s))
+    .join(' <span class="dot">·</span> ');
+
+  const coverImg = cover
+    ? `<img src="${escapeAttr(cover)}" alt="${escapeAttr(album.title)}" class="detail-cover detail-cover-album" />`
+    : '<div class="detail-cover detail-cover-album"></div>';
+
+  // "Where to listen" — search-URL chips, mirroring the book "Where to read" row.
+  const listenQ = encodeURIComponent([artist, album.title].filter(Boolean).join(' ').trim());
+  const listenHtml = listenQ
+    ? `<div class="section">
+         <p class="section-label">Where to listen</p>
+         <div class="providers">
+           ${MUSIC_PLATFORMS.map(
+             (p) =>
+               `<a class="provider-chip provider-chip--link" href="${escapeAttr(p.url(listenQ))}" target="_blank" rel="nofollow noopener"><img src="/retailers/${p.key}.png" alt="" class="provider-icon" loading="lazy" />${escapeHtml(p.label)}</a>`,
+           ).join('')}
+         </div>
+       </div>`
+    : '';
+
+  const body = `
+    <div class="detail-hero">
+      ${coverImg}
+      <h1 class="detail-title">${escapeHtml(album.title)}</h1>
+      ${artist ? `<p class="detail-subtitle">by ${escapeHtml(artist)}</p>` : ''}
+      ${metaLine ? `<p class="detail-meta">${metaLine}</p>` : ''}
+    </div>
+
+    <div class="actions">
+      <button class="pill" type="button" data-share-action="save">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 5C5 3.9 5.9 3 7 3H17C18.1 3 19 3.9 19 5V21L12 17.5L5 21V5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Save
+      </button>
+      <button class="pill" type="button" data-share-action="board">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><path d="M12 8V16M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        Board
+      </button>
+      <button class="pill" type="button" data-share-action="send">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12L21 3L17 21L13 14L3 12Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+        Send
+      </button>
+      <button class="pill" type="button" data-share-action="share">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3V15M12 3L7 8M12 3L17 8M5 21H19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Share
+      </button>
+    </div>
+
+    ${cleanDesc ? `
+    <div class="section">
+      <p class="section-label">About</p>
+      <p class="section-prose">${escapeHtml(cleanDesc)}</p>
+    </div>` : ''}
+
+    ${listenHtml}
+  `;
+
+  const ogImage = await resolveOgImageUrl(cover);
+
+  const html = renderPage({
+    ogTitle,
+    ogDescription,
+    ogImage,
+    ogUrl,
+    sharer,
     modalContext,
     body,
   });

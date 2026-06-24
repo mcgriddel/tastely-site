@@ -1,4 +1,4 @@
-import { escapeHtml, htmlResponse, notFoundPage, renderPage } from '../_lib/template';
+import { escapeAttr, escapeHtml, htmlResponse, notFoundPage, renderPage } from '../_lib/template';
 import { sbFetch, sbFetchOne, type SupabaseEnv } from '../_lib/supabase';
 
 type Env = SupabaseEnv;
@@ -36,6 +36,7 @@ type BoardItemRow = {
       authors?: string[];
       isbn?: string;
       publishedDate?: string;
+      artist_name?: string;
     } | null;
   } | null;
 };
@@ -62,6 +63,36 @@ function gridCoverForItem(it: BoardItemRow['items']): string {
   }
   if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-M.jpg`;
   return '';
+}
+
+// Subtle second caption line for a board tile: the most identifying secondary
+// fact per medium — author (books), artist (albums/podcasts), else release year.
+// Gives a recipient context on each tile without a tap; falls back to year, then
+// nothing. Mirrors how Letterboxd captions a year and Goodreads an author.
+function gridSubtitleForItem(it: NonNullable<BoardItemRow['items']>): string {
+  const m = it.metadata ?? {};
+  const year = (m.releaseDate || m.publishedDate || '').slice(0, 4);
+  if (it.item_type === 'book') return m.authors?.[0] || year;
+  if (it.item_type === 'album' || it.item_type === 'podcast_series') return m.artist_name || year;
+  return year;
+}
+
+// The web share page for a board item, by vertical. Movies have their own
+// `/movie` route keyed by the TMDB external_id; books + albums route through
+// `/item/[id]?type=` keyed by the canonical items.id UUID (mirrors the shapes the
+// app emits — app `src/shared/utils/share.ts`). Verticals without a web page yet
+// (podcast, tv) return null so the tile renders un-linked, never as a dead link.
+function itemShareHref(it: NonNullable<BoardItemRow['items']>, itemId: string): string | null {
+  switch (it.item_type) {
+    case 'movie':
+      return `/movie/${encodeURIComponent(it.external_id)}`;
+    case 'book':
+      return `/item/${encodeURIComponent(itemId)}?type=book`;
+    case 'album':
+      return `/item/${encodeURIComponent(itemId)}?type=album`;
+    default:
+      return null;
+  }
 }
 
 function bigCoverForItem(it: BoardItemRow['items']): string {
@@ -132,24 +163,33 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   const ogDescription = `${count} ${count === 1 ? 'item' : 'items'} curated by ${creator}`;
   const ogImage = board.cover_url || bigCoverForItem(items[0] ?? null);
 
-  const gridHtml = items
-    .map((it) => {
+  const gridHtml = sortedRows
+    .filter((bi): bi is BoardItemRow & { items: NonNullable<BoardItemRow['items']> } => !!bi.items)
+    .map((bi) => {
+      const it = bi.items;
       const cover = gridCoverForItem(it);
       const isSquare = SQUARE_TYPES.has(it.item_type);
       const title = escapeHtml(it.title);
-      const cls = `cover-tile${isSquare ? ' cover-tile--square' : ''}`;
+      const subtitle = escapeHtml(gridSubtitleForItem(it));
+      // Tap-through to the item's share page when its vertical has one (movie /
+      // book / album). Others render as a plain div — no dead links.
+      const href = itemShareHref(it, bi.item_id);
+      const tag = href ? 'a' : 'div';
+      const hrefAttr = href ? ` href="${escapeAttr(href)}"` : '';
+      const cls = `cover-tile${isSquare ? ' cover-tile--square' : ''}${href ? ' cover-tile--link' : ''}`;
       if (!cover) {
         return `
-        <div class="${cls}">
+        <${tag} class="${cls}"${hrefAttr}>
           <div class="cover-img cover-img--placeholder"><span>${title}</span></div>
-        </div>`;
+        </${tag}>`;
       }
+      const captionSub = subtitle ? `<div class="cover-caption-sub">${subtitle}</div>` : '';
       return `
-        <div class="${cls}">
+        <${tag} class="${cls}"${hrefAttr}>
           <img src="${cover}" alt="${title}" class="cover-img" loading="lazy" />
           <div class="cover-scrim" aria-hidden="true"></div>
-          <div class="cover-caption"><div class="cover-caption-title">${title}</div></div>
-        </div>`;
+          <div class="cover-caption"><div class="cover-caption-title">${title}</div>${captionSub}</div>
+        </${tag}>`;
     })
     .join('');
 

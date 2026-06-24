@@ -744,6 +744,13 @@ const BASE_STYLES = `<style>
     border-radius: 50%;
     width: min(180px, 50vw);
   }
+  /* Album art — square with rounded corners (NOT the circular artist/podcast
+     treatment). Slightly larger than a poster since 1:1 reads smaller. */
+  .detail-cover-album {
+    aspect-ratio: 1/1;
+    border-radius: 14px;
+    width: min(260px, 68vw);
+  }
   .detail-eyebrow {
     font-family: 'Inter', sans-serif;
     font-weight: 600;
@@ -1323,6 +1330,13 @@ const BASE_STYLES = `<style>
     background: var(--surface);
     box-shadow: 0 8px 24px rgba(0,0,0,0.34), 0 0 0 1px rgba(255,255,255,0.05);
   }
+  /* Linked tiles (movie/book/album → item share page) lift subtly on hover to
+     signal they're tappable. Touch devices just navigate on tap. */
+  .cover-tile--link { cursor: pointer; transition: transform 0.18s ease, box-shadow 0.18s ease; }
+  .cover-tile--link:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 34px rgba(0,0,0,0.46), 0 0 0 1px rgba(255,255,255,0.12);
+  }
   .cover-img {
     width: 100%;
     height: auto;
@@ -1373,6 +1387,20 @@ const BASE_STYLES = `<style>
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+  }
+  /* Subtle secondary line under the title — author / artist / year. Muted so
+     the title stays the anchor; single line, ellipsised. */
+  .cover-caption-sub {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 400;
+    font-size: 11px;
+    line-height: 1.3;
+    color: rgba(255,255,255,0.72);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.55);
   }
 
   /* ── Legacy classes for board + user routes (pre-S140) ──
