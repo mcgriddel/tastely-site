@@ -190,7 +190,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
 
   const [boardItems, profile] = await Promise.all([
     sbFetch<BoardItemRow>(env, {
-      path: `board_items?board_id=eq.${encodeURIComponent(boardId)}&select=added_at,item_id,items(title,image_url,external_id,item_type,release_date,metadata)&order=position.asc&limit=20`,
+      path: `board_items?board_id=eq.${encodeURIComponent(boardId)}&select=added_at,item_id,items(title,image_url,external_id,item_type,release_date,metadata)&order=position.asc&limit=100`,
       key: 'service',
     }),
     sbFetchOne<Profile>(env, {
