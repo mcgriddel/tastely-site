@@ -41,6 +41,7 @@ type BoardItemRow = {
       publishedDate?: string;
       artist_name?: string;
       author?: string;
+      image_sources?: Array<{ url: string; priority?: number }>;
     } | null;
   } | null;
 };
@@ -57,15 +58,37 @@ function tmdbAtSize(raw: string, size: string): string {
   return `${TMDB_IMAGE_BASE}/${size}${raw}`;
 }
 
+// The clean cover URL for a row: the resolved winner (image_url, an Apple/NYT/
+// rehosted-CDN cover post-2026-06-25 rebuild), else the resolver's image_sources
+// chain (lowest priority = best), else ''. Trust-by-source: no aggregator
+// guessing — we use what the resolver chose.
+function coverChainUrl(it: NonNullable<BoardItemRow['items']>): string {
+  if (it.image_url) return it.image_url;
+  const srcs = it.metadata?.image_sources;
+  if (Array.isArray(srcs) && srcs.length > 0) {
+    const best = [...srcs].sort((a, b) => (a?.priority ?? 99) - (b?.priority ?? 99))[0];
+    if (best?.url) return best.url;
+  }
+  return '';
+}
+
+// Strict OL-by-ISBN — `?default=false` 404s for a missing cover (vs a 1×1
+// blank), so the page falls to its placeholder instead of a broken tile. Only
+// a legacy last resort now that the resolver fills image_url/image_sources.
+function olByIsbnStrict(isbn: string, size: 'M' | 'L'): string {
+  return `https://covers.openlibrary.org/b/isbn/${isbn.replace(/[^0-9Xx]/g, '')}-${size}.jpg?default=false`;
+}
+
 // Grid-scale cover for any vertical. TMDB posters (movie/tv) resized to w342;
-// album/podcast art + book covers used as-is (https-forced); ISBN fallback.
+// album/podcast art + book covers used as-is (https-forced); strict-ISBN fallback.
 function gridCoverForItem(it: BoardItemRow['items']): string {
   if (!it) return '';
-  if (it.image_url) {
-    if (it.image_url.includes('image.tmdb.org')) return tmdbAtSize(it.image_url, 'w342');
-    return it.image_url.replace(/^http:/, 'https:');
+  const url = coverChainUrl(it);
+  if (url) {
+    if (url.includes('image.tmdb.org')) return tmdbAtSize(url, 'w342');
+    return url.replace(/^http:/, 'https:');
   }
-  if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-M.jpg`;
+  if (it.metadata?.isbn) return olByIsbnStrict(it.metadata.isbn, 'M');
   return '';
 }
 
@@ -130,8 +153,9 @@ function itemShareHref(it: NonNullable<BoardItemRow['items']>, itemId: string): 
 function bigCoverForItem(it: BoardItemRow['items']): string {
   if (!it) return '';
   if (it.item_type === 'movie' && it.image_url) return tmdbAtSize(it.image_url, 'w500');
-  if (it.image_url) return it.image_url.replace(/^http:/, 'https:');
-  if (it.metadata?.isbn) return `https://covers.openlibrary.org/b/isbn/${it.metadata.isbn.replace(/[^0-9Xx]/g, '')}-L.jpg`;
+  const url = coverChainUrl(it);
+  if (url) return url.replace(/^http:/, 'https:');
+  if (it.metadata?.isbn) return olByIsbnStrict(it.metadata.isbn, 'L');
   return '';
 }
 
