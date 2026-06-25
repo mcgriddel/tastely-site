@@ -191,6 +191,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
   const count = items.length;
   const creator = profile?.display_name || profile?.username || 'someone';
 
+  // The per-vertical type badge disambiguates a movie tile from a book tile on
+  // a MIXED board. On a single-vertical board every tile carries the same glyph
+  // — pure noise — so only show it when the board spans more than one vertical.
+  const showTypeBadge = new Set(items.map((it) => it.item_type)).size > 1;
+
   const ogTitle = board.name;
   const ogDescription = `${count} ${count === 1 ? 'item' : 'items'} curated by ${creator}`;
   const ogImage = board.cover_url || bigCoverForItem(items[0] ?? null);
@@ -209,7 +214,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ params, env, request })
       const tag = href ? 'a' : 'div';
       const hrefAttr = href ? ` href="${escapeAttr(href)}"` : '';
       const cls = `cover-tile${isSquare ? ' cover-tile--square' : ''}${href ? ' cover-tile--link' : ''}`;
-      const badge = typeBadgeHtml(it.item_type);
+      const badge = showTypeBadge ? typeBadgeHtml(it.item_type) : '';
       if (!cover) {
         return `
         <${tag} class="${cls}"${hrefAttr}>
