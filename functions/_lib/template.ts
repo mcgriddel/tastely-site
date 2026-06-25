@@ -158,7 +158,6 @@ export function renderPage(opts: PageOptions): string {
   <main class="container${wide ? ' container--wide' : ''}">
     ${sharerRow}
     ${body}
-    ${renderTrustFooter()}
   </main>
 
   ${stickyBar}
@@ -189,13 +188,6 @@ function renderSharerRow(p: SharerProfile): string {
       </span>
       <span class="sharer-arrow" aria-hidden="true">→</span>
     </a>`;
-}
-
-function renderTrustFooter(): string {
-  return `
-    <footer class="trust-footer">
-      <p class="trust-copyright">© 2026 Tastely</p>
-    </footer>`;
 }
 
 // On-page actions for share pages. On the web, every action pill opens the same
@@ -989,19 +981,6 @@ const BASE_STYLES = `<style>
   }
   .provider-chip--link:active {
     transform: translateY(0);
-  }
-
-  /* ── Trust footer ── */
-  .trust-footer {
-    margin-top: 48px;
-    padding-top: 24px;
-    border-top: 1px solid var(--border);
-    text-align: center;
-  }
-  .trust-copyright {
-    font-family: 'Outfit', sans-serif;
-    font-size: 11px;
-    color: var(--text-4);
   }
 
   /* ── Sticky bar ── */
