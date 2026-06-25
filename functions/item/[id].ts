@@ -471,9 +471,10 @@ async function renderBook(a: RenderArgs): Promise<Response> {
   // We build our OWN clean links from the ISBN — NOT NYT's `buy_links` (those
   // are affiliate-redirect wrappers carrying NYT's attribution tags). ISBN-
   // direct where the retailer exposes one (B&N ?ean=, Bookshop /book/, Apple
-  // goto-gateway); ISBN/title search otherwise. Apple Books only when we have an
-  // ISBN (no clean search fallback). Logos are the same 64×64 brand tiles the
-  // app bundles, served locally from /retailers/*.png.
+  // goto-gateway); ISBN/title search otherwise. Apple Books leads the row (our
+  // cover source — keeps the cover proximate to its store link) and uses its web
+  // search when there's no ISBN, so it always appears. Logos are the same 64×64
+  // brand tiles the app bundles, served locally from /retailers/*.png.
   //
   // Affiliate attribution choke-point: applyAffiliate() is identity today
   // (clean links, no tags). When Tastely joins retailer programs, inject tags
@@ -488,9 +489,9 @@ async function renderBook(a: RenderArgs): Promise<Response> {
 
   type RetailerSpec = { key: string; label: string; build: (isbn: string | null, q: string) => string | null };
   const RETAILERS: RetailerSpec[] = [
+    { key: 'applebooks', label: 'Apple Books', build: (isbn, q) => (isbn ? `https://goto.applebooks.apple/${isbn}` : `https://books.apple.com/us/search?term=${q}`) },
     { key: 'amazon', label: 'Amazon', build: (isbn, q) => `https://www.amazon.com/s?k=${isbn ?? q}&i=stripbooks` },
     { key: 'kindle', label: 'Kindle', build: (_isbn, q) => `https://www.amazon.com/s?k=${q}&i=digital-text` },
-    { key: 'applebooks', label: 'Apple Books', build: (isbn) => (isbn ? `https://goto.applebooks.apple/${isbn}` : null) },
     { key: 'barnesandnoble', label: 'Barnes & Noble', build: (isbn, q) => (isbn ? `https://www.barnesandnoble.com/w/?ean=${isbn}` : `https://www.barnesandnoble.com/s/${q}`) },
     { key: 'bookshop', label: 'Bookshop.org', build: (isbn, q) => (isbn ? `https://bookshop.org/book/${isbn}` : `https://bookshop.org/search?keywords=${q}`) },
     { key: 'booksamillion', label: 'Books-A-Million', build: (isbn, q) => `https://www.booksamillion.com/search?query=${isbn ?? q}` },
